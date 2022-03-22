@@ -1,5 +1,5 @@
 [package]
-name = "wasm-bindings"
+name = "adnl-wasm"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-adnl = { path = ".." }
+adnl = { path = "..", features = ["alloc"] }
 wasm-bindgen = "0.2.79"
 js-sys = "0.3.56"
 ciborium-io = "0.2.0"
