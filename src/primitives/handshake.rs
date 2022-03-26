@@ -1,11 +1,11 @@
-use ctr::cipher::StreamCipher;
-use aes::cipher::KeyIvInit;
-use sha2::{Sha256, Digest};
-use crate::{AdnlAddress, AdnlAesParams, AdnlPublicKey, AdnlSecret, AdnlClient, Empty, AdnlError};
-use ciborium_io::{Write, Read};
 use crate::primitives::AdnlAes;
+use crate::{AdnlAddress, AdnlAesParams, AdnlClient, AdnlError, AdnlPublicKey, AdnlSecret, Empty};
+use aes::cipher::KeyIvInit;
+use ciborium_io::{Read, Write};
+use ctr::cipher::StreamCipher;
+use sha2::{Digest, Sha256};
 
-
+/// Handshake packet, must be sent from client to server prior to any datagrams
 pub struct AdnlHandshake<P: AdnlPublicKey> {
     receiver: AdnlAddress,
     sender: P,
@@ -14,7 +14,14 @@ pub struct AdnlHandshake<P: AdnlPublicKey> {
 }
 
 impl<P: AdnlPublicKey> AdnlHandshake<P> {
-    pub fn new(receiver: AdnlAddress, sender: P, secret: AdnlSecret, aes_params: AdnlAesParams) -> Self {
+    /// Create handshake with given sender and receiver, who already agreed on given secret, also
+    /// use given session parameters
+    pub fn new(
+        receiver: AdnlAddress,
+        sender: P,
+        secret: AdnlSecret,
+        aes_params: AdnlAesParams,
+    ) -> Self {
         Self {
             receiver,
             sender,
@@ -23,10 +30,12 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
         }
     }
 
+    /// Get session AES parameters
     pub fn aes_params(&self) -> &AdnlAesParams {
         &self.aes_params
     }
 
+    /// Serialize handshake to send it over the transport
     pub fn to_bytes(&self) -> [u8; 256] {
         let mut packet = [0u8; 256];
         packet[..32].copy_from_slice(self.receiver.as_bytes());
@@ -52,7 +61,11 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
         packet
     }
 
-    pub fn perform_handshake<T: Read + Write>(&self, transport: T) -> Result<AdnlClient<T>, AdnlError<T, T, Empty>> {
+    /// Send handshake over the given transport, build [`AdnlClient`] on top of it
+    pub fn perform_handshake<T: Read + Write>(
+        &self,
+        transport: T,
+    ) -> Result<AdnlClient<T>, AdnlError<T, T, Empty>> {
         AdnlClient::perform_handshake(transport, self)
     }
 }

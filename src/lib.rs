@@ -4,14 +4,13 @@ pub use helper_types::{AdnlAddress, AdnlAesParams, AdnlError, AdnlPublicKey, Adn
 pub use primitives::handshake::AdnlHandshake;
 pub use primitives::receive::AdnlReceiver;
 pub use primitives::send::AdnlSender;
-pub use wrappers::client::AdnlClient;
 pub use wrappers::builder::AdnlBuilder;
+pub use wrappers::client::AdnlClient;
 
 mod helper_types;
-mod primitives;
 mod integrations;
+mod primitives;
 mod wrappers;
 
 #[cfg(test)]
 mod tests;
-

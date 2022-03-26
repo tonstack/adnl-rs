@@ -1,5 +1,5 @@
-use sha2::{Sha256, Digest};
 use ciborium_io::{Read, Write};
+use sha2::{Digest, Sha256};
 
 pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
 
@@ -8,7 +8,7 @@ impl<T> CryptoRandom for T where T: rand_core::RngCore + rand_core::CryptoRng {}
 pub trait AdnlPublicKey {
     fn address(&self) -> AdnlAddress {
         let mut hasher = Sha256::new();
-        hasher.update([0xc6, 0xb4, 0x13, 0x48]);  // type id - always ed25519
+        hasher.update([0xc6, 0xb4, 0x13, 0x48]); // type id - always ed25519
         hasher.update(&self.to_bytes());
         AdnlAddress(hasher.finalize().try_into().unwrap())
     }
@@ -16,23 +16,32 @@ pub trait AdnlPublicKey {
     fn to_bytes(&self) -> [u8; 32];
 }
 
+/// Public key can be provided using raw slice
 impl AdnlPublicKey for [u8; 32] {
     fn to_bytes(&self) -> [u8; 32] {
         *self
     }
 }
 
+/// Trait which must be implemented to perform key agreement inside [`AdnlHandshake`]
 pub trait AdnlPrivateKey {
     type PublicKey: AdnlPublicKey;
 
+    /// Perform key agreement protocol (usually x25519) between our private key
+    /// and their public
     fn key_agreement<P: AdnlPublicKey>(&self, their_public: P) -> AdnlSecret;
+
+    /// Get public key corresponding to this private
     fn public(&self) -> Self::PublicKey;
 }
 
+/// Wrapper struct to hold the secret, result of ECDH between peers
 pub struct AdnlSecret([u8; 32]);
 
+/// Wrapper struct to hold ADNL address, which is a hash of public key
 pub struct AdnlAddress([u8; 32]);
 
+/// Session parameters for AES-CTR encryption of datagrams
 pub struct AdnlAesParams {
     rx_key: [u8; 32],
     tx_key: [u8; 32],
@@ -70,6 +79,7 @@ impl AdnlAesParams {
         &self.tx_nonce
     }
 
+    /// Serialize this structure into bytes to use in handshake packet
     pub fn to_bytes(&self) -> [u8; 160] {
         let mut result = [0u8; 160];
         result[..32].copy_from_slice(&self.rx_key);
@@ -80,6 +90,7 @@ impl AdnlAesParams {
         result
     }
 
+    /// Generate random session parameters
     pub fn random<T: CryptoRandom>(csprng: &mut T) -> Self {
         let mut result: AdnlAesParams = Default::default();
         csprng.fill_bytes(&mut result.rx_key);
@@ -133,6 +144,7 @@ impl AdnlSecret {
     }
 }
 
+/// Empty transport to use when there is nothing to read or write
 #[derive(Debug)]
 pub struct Empty;
 
@@ -156,6 +168,7 @@ impl Read for Empty {
     }
 }
 
+/// Common error type
 #[derive(Debug)]
 pub enum AdnlError<R: Read, W: Write, C: Write> {
     ReadError(R::Error),
