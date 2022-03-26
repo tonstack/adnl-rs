@@ -6,15 +6,15 @@ use ciborium_io::{Write, Read};
 use crate::primitives::AdnlAes;
 
 
-pub struct AdnlHandshake {
+pub struct AdnlHandshake<P: AdnlPublicKey> {
     receiver: AdnlAddress,
-    sender: AdnlPublicKey,
+    sender: P,
     aes_params: AdnlAesParams,
     secret: AdnlSecret,
 }
 
-impl AdnlHandshake {
-    pub fn new(receiver: AdnlAddress, sender: AdnlPublicKey, secret: AdnlSecret, aes_params: AdnlAesParams) -> Self {
+impl<P: AdnlPublicKey> AdnlHandshake<P> {
+    pub fn new(receiver: AdnlAddress, sender: P, secret: AdnlSecret, aes_params: AdnlAesParams) -> Self {
         Self {
             receiver,
             sender,
@@ -30,7 +30,7 @@ impl AdnlHandshake {
     pub fn to_bytes(&self) -> [u8; 256] {
         let mut packet = [0u8; 256];
         packet[..32].copy_from_slice(self.receiver.as_bytes());
-        packet[32..64].copy_from_slice(self.sender.as_bytes());
+        packet[32..64].copy_from_slice(&self.sender.to_bytes());
 
         let mut raw_params = self.aes_params.to_bytes();
         let mut hasher = Sha256::new();

@@ -1,5 +1,5 @@
 use ciborium_io::{Read, Write};
-use crate::{AdnlHandshake, AdnlReceiver, AdnlSender, AdnlError, Empty};
+use crate::{AdnlHandshake, AdnlReceiver, AdnlSender, AdnlError, Empty, AdnlPublicKey};
 
 pub struct AdnlClient<T: Read + Write> {
     sender: AdnlSender,
@@ -8,7 +8,7 @@ pub struct AdnlClient<T: Read + Write> {
 }
 
 impl<T: Read + Write> AdnlClient<T> {
-    pub fn perform_handshake(mut transport: T, handshake: &AdnlHandshake) -> Result<Self, AdnlError<T, T, Empty>> {
+    pub fn perform_handshake<P: AdnlPublicKey>(mut transport: T, handshake: &AdnlHandshake<P>) -> Result<Self, AdnlError<T, T, Empty>> {
         // send handshake
         transport.write_all(&handshake.to_bytes()).map_err(|e| AdnlError::WriteError(e))?;
 

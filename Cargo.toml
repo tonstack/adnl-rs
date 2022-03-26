@@ -12,6 +12,7 @@ log = "0.4.14"
 ciborium-io = "0.2.0"
 rand_core = "0.6.3"
 x25519-dalek = { version = "2.0.0-pre.1", optional = true }
+curve25519-dalek = { version = "4.0.0-pre.2", optional = true }
 
 [dev-dependencies]
 hex = "0.4.3"
@@ -22,7 +23,7 @@ base64 = "0.13.0"
 
 [features]
 default = []
-dalek = ["x25519-dalek"]
+dalek = ["x25519-dalek", "curve25519-dalek"]
 alloc = ["ciborium-io/alloc"]
 std = ["ciborium-io/std"]
 

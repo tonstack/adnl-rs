@@ -2,13 +2,36 @@ use sha2::{Sha256, Digest};
 use ciborium_io::{Read, Write};
 
 pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
-impl <T> CryptoRandom for T where T: rand_core::RngCore + rand_core::CryptoRng {}
 
-pub struct AdnlAddress(pub(crate) [u8; 32]);
+impl<T> CryptoRandom for T where T: rand_core::RngCore + rand_core::CryptoRng {}
 
-pub struct AdnlPublicKey(pub(crate) [u8; 32]);
+pub trait AdnlPublicKey {
+    fn address(&self) -> AdnlAddress {
+        let mut hasher = Sha256::new();
+        hasher.update([0xc6, 0xb4, 0x13, 0x48]);  // type id - always ed25519
+        hasher.update(&self.to_bytes());
+        AdnlAddress(hasher.finalize().try_into().unwrap())
+    }
 
-pub struct AdnlSecret(pub(crate) [u8; 32]);
+    fn to_bytes(&self) -> [u8; 32];
+}
+
+impl AdnlPublicKey for [u8; 32] {
+    fn to_bytes(&self) -> [u8; 32] {
+        *self
+    }
+}
+
+pub trait AdnlPrivateKey {
+    type PublicKey: AdnlPublicKey;
+
+    fn key_agreement<P: AdnlPublicKey>(&self, their_public: P) -> AdnlSecret;
+    fn public(&self) -> Self::PublicKey;
+}
+
+pub struct AdnlSecret([u8; 32]);
+
+pub struct AdnlAddress([u8; 32]);
 
 pub struct AdnlAesParams {
     rx_key: [u8; 32],
@@ -86,34 +109,7 @@ impl From<[u8; 32]> for AdnlSecret {
     }
 }
 
-impl From<[u8; 32]> for AdnlPublicKey {
-    fn from(public_key: [u8; 32]) -> Self {
-        Self(public_key)
-    }
-}
-
-impl From<AdnlPublicKey> for AdnlAddress {
-    fn from(public_key: AdnlPublicKey) -> Self {
-        let mut hasher = Sha256::new();
-        hasher.update([0xc6, 0xb4, 0x13, 0x48]);  // type id - always ed25519
-        hasher.update(public_key.0);
-        Self(hasher.finalize().try_into().unwrap())
-    }
-}
-
 impl AdnlAddress {
-    #[inline]
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0
-    }
-
-    #[inline]
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
-
-impl AdnlPublicKey {
     #[inline]
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0

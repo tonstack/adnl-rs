@@ -67,7 +67,7 @@ impl AdnlReceiver {
         self.aes.apply_keystream(&mut given_hash);
 
         let real_hash = hasher.finalize();
-        if real_hash.as_slice() != &given_hash {
+        if real_hash.as_slice() != given_hash {
             return Err(AdnlError::IntegrityError);
         }
 

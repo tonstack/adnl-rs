@@ -5,7 +5,7 @@ extern crate alloc;
 use ciborium_io::{Read, Write};
 use js_sys::{Function, Uint8Array};
 use wasm_bindgen::prelude::*;
-use adnl::{AdnlAddress, AdnlAesParams, AdnlBuilder, AdnlClient, AdnlPublicKey, AdnlSecret};
+use adnl::{AdnlAesParams, AdnlBuilder, AdnlClient, AdnlPublicKey, AdnlSecret};
 use alloc::vec::Vec;
 
 #[wasm_bindgen]
@@ -71,11 +71,9 @@ impl Client {
         sender_pub_js.copy_to(&mut sender_pub);
         secret_js.copy_to(&mut secret);
         let aes_params = AdnlAesParams::from(aes_params);
-        let receiver_addr: AdnlAddress = AdnlPublicKey::from(receiver_pub).into();
-        let sender_pub = AdnlPublicKey::from(sender_pub);
         let secret = AdnlSecret::from(secret);
         let client = AdnlBuilder::with_static_aes_params(aes_params)
-            .use_static_ecdh(sender_pub, receiver_addr, secret)
+            .use_static_ecdh(sender_pub, receiver_pub.address(), secret)
             .perform_handshake(transport)
             .map_err(|e| alloc::format!("{:?}", e))?;
         Ok(Self { client })

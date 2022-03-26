@@ -1,46 +1,35 @@
 use crate::{AdnlAesParams, AdnlHandshake, AdnlPublicKey, AdnlAddress, AdnlSecret};
 
-use crate::helper_types::CryptoRandom;
+use crate::helper_types::{AdnlPrivateKey, CryptoRandom};
 
-enum AesOptions<'a> {
-    StaticParams(AdnlAesParams),
-    RandomParams(&'a mut dyn CryptoRandom),
+pub struct AdnlBuilder {
+    aes_params: AdnlAesParams,
 }
 
-pub struct AdnlBuilder<'a> {
-    aes_options: AesOptions<'a>,
-}
-
-impl<'a> AdnlBuilder<'a> {
+impl AdnlBuilder {
     pub fn with_static_aes_params(aes_params: AdnlAesParams) -> Self {
         Self {
-            aes_options: AesOptions::StaticParams(aes_params)
+            aes_params
         }
     }
 
-    pub fn with_random_aes_params(rng: &'a mut dyn CryptoRandom) -> Self {
+    pub fn with_random_aes_params<R: CryptoRandom>(rng: &mut R) -> Self {
         Self {
-            aes_options: AesOptions::RandomParams(rng)
-        }
-    }
-
-    pub fn use_static_ecdh<S, R, E>(self, sender_public: S, receiver_address: R, ecdh_secret: E) -> AdnlHandshake
-        where S: Into<AdnlPublicKey>, R: Into<AdnlAddress>, E: Into<AdnlSecret>
-    {
-        let sender_public = sender_public.into();
-        let receiver_address = receiver_address.into();
-        let ecdh_secret = ecdh_secret.into();
-
-        // make aes params
-        let aes_params = match self.aes_options {
-            AesOptions::StaticParams(aes_params) => aes_params,
-            AesOptions::RandomParams(rng) => {
+            aes_params: {
                 let mut buffer = [0u8; 160];
                 rng.fill_bytes(&mut buffer);
                 AdnlAesParams::from(buffer)
             }
-        };
+        }
+    }
 
-        AdnlHandshake::new(receiver_address, sender_public, ecdh_secret, aes_params)
+    pub fn use_static_ecdh<P: AdnlPublicKey>(self, sender_public: P, receiver_address: AdnlAddress, ecdh_secret: AdnlSecret) -> AdnlHandshake<P>
+    {
+        AdnlHandshake::new(receiver_address, sender_public, ecdh_secret, self.aes_params)
+    }
+
+    pub fn perform_ecdh<S, P>(self, sender_private: S, receiver_public: P) -> AdnlHandshake<<S as AdnlPrivateKey>::PublicKey>
+        where S: AdnlPrivateKey, P: AdnlPublicKey {
+        AdnlHandshake::new(receiver_public.address(), sender_private.public(), sender_private.key_agreement(receiver_public), self.aes_params)
     }
 }
