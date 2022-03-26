@@ -1,6 +1,9 @@
 [package]
 name = "adnl"
 description = "Implementation of Abstract Datagram Network Layer"
+repository = "https://github.com/tonstack/adnl-rs"
+keywords = ["ton"]
+categories = ["network-programming"]
 license = "MIT"
 version = "0.1.0"
 authors = ["Vladimir Lebedev <d3fl4t3@gmail.com>"]
