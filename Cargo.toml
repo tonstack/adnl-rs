@@ -1,5 +1,7 @@
 [package]
 name = "adnl"
+description = "Implementation of Abstract Datagram Network Layer"
+license = "MIT"
 version = "0.1.0"
 authors = ["Vladimir Lebedev <d3fl4t3@gmail.com>"]
 edition = "2021"
