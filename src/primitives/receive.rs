@@ -19,7 +19,7 @@ impl AdnlReceiver {
     }
 
     /// Receive datagram from `transport`. Received parts of the decrypted buffer
-    /// will be sent to `consumer`, which usually can be just [`Vec`]. Note that
+    /// will be sent to `consumer`, which usually can be just `Vec`. Note that
     /// data can be processed before this function will return, but in case of
     /// [`AdnlError::IntegrityError`] you must assume that the data was tampered.
     ///

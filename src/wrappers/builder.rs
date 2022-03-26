@@ -2,7 +2,7 @@ use crate::{AdnlAddress, AdnlAesParams, AdnlHandshake, AdnlPublicKey, AdnlSecret
 
 use crate::helper_types::{AdnlPrivateKey, CryptoRandom};
 
-/// Builder of [`AdnlHandshake`] structure, which then can be transformed into [`AdnlClient`]
+/// Builder of [`AdnlHandshake`] structure, which then can be transformed into [`crate::AdnlClient`]
 pub struct AdnlBuilder {
     aes_params: AdnlAesParams,
 }
