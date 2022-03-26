@@ -51,17 +51,10 @@ fn test_handshake(
     let aes_params: [u8; 160] = aes_params.try_into().unwrap();
     let aes_params = AdnlAesParams::from(aes_params);
     let remote_public: [u8; 32] = remote_public.try_into().unwrap();
-    let remote_public = AdnlPublicKey::from(remote_public);
     let local_public: [u8; 32] = local_public.try_into().unwrap();
-    let local_public = AdnlPublicKey::from(local_public);
     let ecdh: [u8; 32] = ecdh.try_into().unwrap();
     let ecdh = AdnlSecret::from(ecdh);
-    let handshake = AdnlHandshake::new(
-        AdnlAddress::from(remote_public),
-        local_public,
-        ecdh,
-        aes_params,
-    );
+    let handshake = AdnlHandshake::new(remote_public.address(), local_public, ecdh, aes_params);
     assert_eq!(
         handshake.to_bytes(),
         expected_handshake.as_slice(),
