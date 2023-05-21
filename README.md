@@ -1,22 +1,17 @@
 # ADNL
 
-> :warning: **WARNING:** the library is not ready for production yet, public API is a subject to change.
+Minimal ADNL implementation in Rust (client-server only, without p2p for now). Specification of ADNL is available [here](https://github.com/tonstack/ton-docs/blob/main/ADNL/README.md).
 
-Minimal ADNL implementation in Rust (client-server only, without p2p for now).
+| Feature       | Implemented?                     |
+| ------------- | -------------------------------- |
+| ADNL Client   | ✅                              |
+| ADNL Server   | ❌                              |
+| ADNL P2P      | ❌                              |
+| no_std        | ✅                              |
+| ed25519 libs  | curve25519_dalek + x25519_dalek  |
 
-##  Roadmap
-
-- [x] Clarify where to use Montgomery and where -- compressed Edwards (curve25519)
-- [x] API docs & examples
-- [ ] Extract JS examples from JS library
-- [x] Write ADNL specification to [ton-docs](https://github.com/tonstack/ton-docs)
-- [ ] Implement server side & p2p protocol
-- [ ] Implement high-level JS library on top of raw bindings
-- [ ] Add benchmarks
-- [ ] Publish package to crates.io and npmjs.com
-
-## Rust Quickstart
-Run this example: `cargo run --example time --features "std dalek" -- get-time`
+## Quickstart
+Run this example: `cargo run --example time --features "std dalek"`
 
 ```rust
 use adnl::{AdnlBuilder, AdnlClient};
@@ -78,12 +73,4 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
-
-```
-
-## WASM Quickstart
-```bash
-cd wasm-bindings
-npm i
-npm run serve
 ```
