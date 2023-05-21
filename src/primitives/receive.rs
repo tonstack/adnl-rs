@@ -52,7 +52,7 @@ impl AdnlReceiver {
             .read_exact(&mut nonce)
             .map_err(|e| AdnlError::ReadError(e))?;
         self.aes.apply_keystream(&mut nonce);
-        hasher.update(&nonce);
+        hasher.update(nonce);
 
         // read buffer chunks, decrypt and write to consumer
         if BUFFER > 0 {

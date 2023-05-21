@@ -37,7 +37,7 @@ impl AdnlSender {
 
         // calc hash
         let mut hasher = Sha256::new();
-        hasher.update(&*nonce);
+        hasher.update(*nonce);
         hasher.update(&*buffer);
         let mut hash: [u8; 32] = hasher.finalize().try_into().unwrap();
 
