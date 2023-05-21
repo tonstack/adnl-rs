@@ -68,7 +68,7 @@ impl AdnlReceiver {
                     .read_exact(&mut buffer)
                     .map_err(|e| AdnlError::ReadError(e))?;
                 self.aes.apply_keystream(&mut buffer);
-                hasher.update(&buffer);
+                hasher.update(buffer);
                 consumer
                     .write_all(&buffer)
                     .map_err(|e| AdnlError::ConsumeError(e))?;
