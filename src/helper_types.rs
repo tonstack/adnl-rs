@@ -9,7 +9,7 @@ pub trait AdnlPublicKey {
     fn address(&self) -> AdnlAddress {
         let mut hasher = Sha256::new();
         hasher.update([0xc6, 0xb4, 0x13, 0x48]); // type id - always ed25519
-        hasher.update(&self.to_bytes());
+        hasher.update(self.to_bytes());
         AdnlAddress(hasher.finalize().try_into().unwrap())
     }
 
