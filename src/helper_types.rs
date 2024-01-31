@@ -1,5 +1,9 @@
+use std::io::Error;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use ciborium_io::{Read, Write};
 use sha2::{Digest, Sha256};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
 
@@ -148,6 +152,26 @@ impl AdnlSecret {
 #[derive(Debug)]
 pub struct Empty;
 
+impl AsyncWrite for Empty {
+    fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &[u8]) -> Poll<Result<usize, Error>> {
+        Poll::Ready(Ok(0))
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncRead for Empty {
+    fn poll_read(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
 impl Write for Empty {
     type Error = ();
 
@@ -170,10 +194,11 @@ impl Read for Empty {
 
 /// Common error type
 #[derive(Debug)]
-pub enum AdnlError<R: Read, W: Write, C: Write> {
-    ReadError(R::Error),
-    WriteError(W::Error),
-    ConsumeError(C::Error),
+pub enum AdnlError<R: AsyncRead, W: AsyncWrite, C: AsyncWrite> {
+    ReadError(R),
+    WriteError(W),
+    ConsumeError(C),
     IntegrityError,
     TooShortPacket,
+    IoError(Error)
 }

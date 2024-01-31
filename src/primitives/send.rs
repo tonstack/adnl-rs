@@ -1,7 +1,7 @@
 use aes::cipher::KeyIvInit;
-use ciborium_io::Write;
 use ctr::cipher::StreamCipher;
 use sha2::{Digest, Sha256};
+use tokio::io::AsyncWriteExt;
 
 use crate::primitives::AdnlAes;
 use crate::{AdnlAesParams, AdnlError, Empty};
@@ -26,7 +26,7 @@ impl AdnlSender {
 
     /// Send `buffer` over `transport` with `nonce`. Note that `nonce` must be random
     /// in order to prevent bit-flipping attacks when an attacker knows whole plaintext in datagram.
-    pub fn send<W: Write>(
+    pub async fn send<W: AsyncWriteExt + Unpin>(
         &mut self,
         transport: &mut W,
         nonce: &mut [u8; 32],
@@ -49,18 +49,18 @@ impl AdnlSender {
 
         // write to transport
         transport
-            .write_all(&length)
-            .map_err(|e| AdnlError::WriteError(e))?;
+            .write_all(&length).await
+            .map_err(|e| AdnlError::IoError(e))?;
         transport
-            .write_all(nonce)
-            .map_err(|e| AdnlError::WriteError(e))?;
+            .write_all(nonce).await
+            .map_err(|e| AdnlError::IoError(e))?;
         transport
-            .write_all(buffer)
-            .map_err(|e| AdnlError::WriteError(e))?;
+            .write_all(buffer).await
+            .map_err(|e| AdnlError::IoError(e))?;
         transport
-            .write_all(&hash)
-            .map_err(|e| AdnlError::WriteError(e))?;
-        transport.flush().map_err(|e| AdnlError::WriteError(e))?;
+            .write_all(&hash).await
+            .map_err(|e| AdnlError::IoError(e))?;
+        transport.flush().await.map_err(|e| AdnlError::IoError(e))?;
 
         Ok(())
     }
