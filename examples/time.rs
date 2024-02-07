@@ -1,36 +1,36 @@
-use adnl::{AdnlBuilder, AdnlClient};
-use std::error::Error;
+use adnl::{AdnlBuilder, AdnlClient, AdnlError};
 use std::net::SocketAddrV4;
 use x25519_dalek::StaticSecret;
 use tokio::net::TcpStream;
+use anyhow::{anyhow, Context, Result};
 
 pub async fn connect(
     ls_public: &str,
     ls_ip: &str,
     ls_port: u16,
-) -> Result<AdnlClient<TcpStream>, Box<dyn Error>> {
+) -> Result<AdnlClient<TcpStream>> {
     // decode liteserver public key
-    let remote_public: [u8; 32] = base64::decode(ls_public)?
-        .try_into()
-        .map_err(|_| "bad public key length")?;
+    let remote_public: [u8; 32] = base64::decode(ls_public)
+        .context("Error decode base64")?
+        .try_into().map_err(|_| anyhow!("Bad public key length"))?;
 
     // generate private key
     let local_secret = StaticSecret::new(rand::rngs::OsRng);
 
     // use TcpStream as transport for our ADNL connection
-    let transport = TcpStream::connect(SocketAddrV4::new(ls_ip.parse()?, ls_port)).await?;
+    let transport = TcpStream::connect(SocketAddrV4::new(ls_ip.parse()?, ls_port)).await
+        .context("Connection error")?;
 
     // build handshake using random session keys, encrypt it with ECDH(local_secret, remote_public)
     // then perform handshake over our TcpStream
     let client = AdnlBuilder::with_random_aes_params(&mut rand::rngs::OsRng)
         .perform_ecdh(local_secret, remote_public)
-        .perform_handshake(transport).await
-        .map_err(|e| format!("{:?}", e))?;
+        .perform_handshake(transport).await?;
     Ok(client)
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<()> {
     // create AdnlClient
     let mut client = connect(
         "JhXt7H1dZTgxQTIyGiYV4f9VUARuDxFl/1kVBjLSMB8=",
@@ -43,14 +43,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // send over ADNL, use random nonce
     client
-        .send(&mut query, &mut rand::random()).await
-        .map_err(|e| format!("{:?}", e))?;
+        .send(&mut query, &mut rand::random()).await?;
 
     // receive result into vector, use 8192 bytes buffer
     let mut result = Vec::<u8>::new();
     client
-        .receive::<_, 8192>(&mut result).await
-        .map_err(|e| format!("{:?}", e))?;
+        .receive::<_, 8192>(&mut result).await?;
 
     // get time from serialized TL answer
     println!(

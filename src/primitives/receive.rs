@@ -29,13 +29,13 @@ impl AdnlReceiver {
         &mut self,
         transport: &mut R,
         consumer: &mut C,
-    ) -> Result<(), AdnlError<R, Empty, C>> {
+    ) -> Result<(), AdnlError> {
         // read length
         let mut length = [0u8; 4];
         log::debug!("reading length");
         transport
             .read_exact(&mut length).await
-            .map_err(|e| AdnlError::IoError(e))?;
+            .map_err(AdnlError::ReadError)?;
         self.aes.apply_keystream(&mut length);
         let length = u32::from_le_bytes(length);
         log::debug!("length = {}", length);
@@ -50,7 +50,7 @@ impl AdnlReceiver {
         log::debug!("reading nonce");
         transport
             .read_exact(&mut nonce).await
-            .map_err(|e| AdnlError::IoError(e))?;
+            .map_err(AdnlError::ReadError)?;
         self.aes.apply_keystream(&mut nonce);
         hasher.update(nonce);
 
@@ -66,12 +66,12 @@ impl AdnlReceiver {
                 );
                 transport
                     .read_exact(&mut buffer).await
-                    .map_err(|e| AdnlError::IoError(e))?;
+                    .map_err(AdnlError::ReadError)?;
                 self.aes.apply_keystream(&mut buffer);
                 hasher.update(buffer);
                 consumer
                     .write_all(&buffer).await
-                    .map_err(|e| AdnlError::IoError(e))?;
+                    .map_err(AdnlError::WriteError)?;
                 bytes_to_read -= BUFFER;
             }
 
@@ -81,12 +81,12 @@ impl AdnlReceiver {
                 let buffer = &mut buffer[..bytes_to_read];
                 transport
                     .read_exact(buffer).await
-                    .map_err(|e| AdnlError::IoError(e))?;
+                    .map_err(AdnlError::ReadError)?;
                 self.aes.apply_keystream(buffer);
                 hasher.update(&buffer);
                 consumer
                     .write_all(buffer).await
-                    .map_err(|e| AdnlError::IoError(e))?;
+                    .map_err(AdnlError::WriteError)?;
             }
         }
 
@@ -94,7 +94,7 @@ impl AdnlReceiver {
         log::debug!("reading hash");
         transport
             .read_exact(&mut given_hash).await
-            .map_err(|e| AdnlError::IoError(e))?;
+            .map_err(AdnlError::ReadError)?;
         self.aes.apply_keystream(&mut given_hash);
 
         let real_hash = hasher.finalize();

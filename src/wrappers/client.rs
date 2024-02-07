@@ -13,11 +13,11 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
     pub async fn perform_handshake<P: AdnlPublicKey>(
         mut transport: T,
         handshake: &AdnlHandshake<P>,
-    ) -> Result<Self, AdnlError<T, T, Empty>> {
+    ) -> Result<Self, AdnlError> {
         // send handshake
         transport
             .write_all(&handshake.to_bytes()).await
-            .map_err(|e| AdnlError::IoError(e))?;
+            .map_err(AdnlError::WriteError)?;
 
         // receive empty message to ensure that server knows our AES keys
         let mut client = Self {
@@ -25,14 +25,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
             receiver: AdnlReceiver::new(handshake.aes_params()),
             transport,
         };
-        client.receive::<_, 0>(&mut Empty).await.map_err(|e| match e {
-            AdnlError::ReadError(err) => AdnlError::ReadError(err),
-            AdnlError::WriteError(_) => unreachable!(),
-            AdnlError::ConsumeError(err) => AdnlError::ConsumeError(err),
-            AdnlError::IntegrityError => AdnlError::IntegrityError,
-            AdnlError::TooShortPacket => AdnlError::TooShortPacket,
-            AdnlError::IoError(err) => AdnlError::IoError(err)
-        })?;
+        client.receive::<_, 0>(&mut Empty).await?;
         Ok(client)
     }
 
@@ -41,7 +34,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
         &mut self,
         data: &mut [u8],
         nonce: &mut [u8; 32],
-    ) -> Result<(), AdnlError<Empty, T, Empty>> {
+    ) -> Result<(), AdnlError> {
         self.sender.send(&mut self.transport, nonce, data).await
     }
 
@@ -50,7 +43,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
     pub async fn receive<C: AsyncWriteExt + Unpin, const BUFFER: usize>(
         &mut self,
         consumer: &mut C,
-    ) -> Result<(), AdnlError<T, Empty, C>> {
+    ) -> Result<(), AdnlError> {
         self.receiver
             .receive::<_, _, BUFFER>(&mut self.transport, consumer).await
     }

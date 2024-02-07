@@ -65,7 +65,7 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
     pub async fn perform_handshake<T: AsyncReadExt + AsyncWriteExt + Unpin>(
         &self,
         transport: T,
-    ) -> Result<AdnlClient<T>, AdnlError<T, T, Empty>> {
+    ) -> Result<AdnlClient<T>, AdnlError> {
         AdnlClient::perform_handshake(transport, self).await
     }
 }

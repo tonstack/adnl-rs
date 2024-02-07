@@ -31,7 +31,7 @@ impl AdnlSender {
         transport: &mut W,
         nonce: &mut [u8; 32],
         buffer: &mut [u8],
-    ) -> Result<(), AdnlError<Empty, W, Empty>> {
+    ) -> Result<(), AdnlError> {
         // remember not to send more than 4 GiB in a single packet
         let mut length = ((buffer.len() + 64) as u32).to_le_bytes();
 
@@ -50,17 +50,17 @@ impl AdnlSender {
         // write to transport
         transport
             .write_all(&length).await
-            .map_err(|e| AdnlError::IoError(e))?;
+            .map_err(AdnlError::WriteError)?;
         transport
             .write_all(nonce).await
-            .map_err(|e| AdnlError::IoError(e))?;
+            .map_err(AdnlError::WriteError)?;
         transport
             .write_all(buffer).await
-            .map_err(|e| AdnlError::IoError(e))?;
+            .map_err(AdnlError::WriteError)?;
         transport
             .write_all(&hash).await
-            .map_err(|e| AdnlError::IoError(e))?;
-        transport.flush().await.map_err(|e| AdnlError::IoError(e))?;
+            .map_err(AdnlError::WriteError)?;
+        transport.flush().await.map_err(AdnlError::WriteError)?;
 
         Ok(())
     }

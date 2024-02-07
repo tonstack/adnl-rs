@@ -3,6 +3,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use ciborium_io::{Read, Write};
 use sha2::{Digest, Sha256};
+use thiserror::Error;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
@@ -193,12 +194,18 @@ impl Read for Empty {
 }
 
 /// Common error type
-#[derive(Debug)]
-pub enum AdnlError<R: AsyncRead, W: AsyncWrite, C: AsyncWrite> {
-    ReadError(R),
-    WriteError(W),
-    ConsumeError(C),
+#[derive(Debug, Error)]
+pub enum AdnlError {
+    #[error("Read error")]
+    ReadError(Error),
+    #[error("Write error")]
+    WriteError(Error),
+    #[error("Consume error")]
+    ConsumeError(Error),
+    #[error("Integrity error")]
     IntegrityError,
+    #[error("TooShortPacket error")]
     TooShortPacket,
-    IoError(Error)
+    #[error(transparent)]
+    OtherError(#[from] Error)
 }
