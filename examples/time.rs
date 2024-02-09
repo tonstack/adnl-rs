@@ -1,4 +1,4 @@
-use adnl::{AdnlBuilder, AdnlClient, AdnlError};
+use adnl::{AdnlBuilder, AdnlClient};
 use std::net::SocketAddrV4;
 use x25519_dalek::StaticSecret;
 use tokio::net::TcpStream;

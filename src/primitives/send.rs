@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 use tokio::io::AsyncWriteExt;
 
 use crate::primitives::AdnlAes;
-use crate::{AdnlAesParams, AdnlError, Empty};
+use crate::{AdnlAesParams, AdnlError};
 
 /// Low-level outgoing datagram generator
 pub struct AdnlSender {

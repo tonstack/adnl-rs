@@ -1,5 +1,5 @@
 use crate::primitives::AdnlAes;
-use crate::{AdnlAesParams, AdnlError, Empty};
+use crate::{AdnlAesParams, AdnlError};
 use aes::cipher::KeyIvInit;
 use ctr::cipher::StreamCipher;
 use sha2::{Digest, Sha256};

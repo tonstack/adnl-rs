@@ -1,10 +1,6 @@
 use std::io::Error;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use ciborium_io::{Read, Write};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
 
@@ -146,50 +142,6 @@ impl AdnlSecret {
     #[inline]
     pub fn as_bytes(&self) -> &[u8; 32] {
         &self.0
-    }
-}
-
-/// Empty transport to use when there is nothing to read or write
-#[derive(Debug)]
-pub struct Empty;
-
-impl AsyncWrite for Empty {
-    fn poll_write(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &[u8]) -> Poll<Result<usize, Error>> {
-        Poll::Ready(Ok(0))
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
-        Poll::Ready(Ok(()))
-    }
-}
-
-impl AsyncRead for Empty {
-    fn poll_read(self: Pin<&mut Self>, _cx: &mut Context<'_>, _buf: &mut ReadBuf<'_>) -> Poll<std::io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-}
-
-impl Write for Empty {
-    type Error = ();
-
-    fn write_all(&mut self, _data: &[u8]) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-impl Read for Empty {
-    type Error = ();
-
-    fn read_exact(&mut self, _data: &mut [u8]) -> Result<(), Self::Error> {
-        Ok(())
     }
 }
 

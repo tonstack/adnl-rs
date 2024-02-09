@@ -1,4 +1,4 @@
-use crate::{AdnlError, AdnlHandshake, AdnlPublicKey, AdnlReceiver, AdnlSender, Empty};
+use crate::{AdnlError, AdnlHandshake, AdnlPublicKey, AdnlReceiver, AdnlSender};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Abstraction over [`AdnlSender`] and [`AdnlReceiver`] to keep things simple
