@@ -25,7 +25,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
             receiver: AdnlReceiver::new(handshake.aes_params()),
             transport,
         };
-        client.receive::<_, 0>(&mut Empty).await?;
+        client.receiver.handshake(&mut client.transport).await?;
         Ok(client)
     }
 

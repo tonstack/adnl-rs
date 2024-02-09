@@ -17,6 +17,50 @@ impl AdnlReceiver {
             aes: AdnlAes::new(aes_params.rx_key().into(), aes_params.rx_nonce().into()),
         }
     }
+    /// Receive handshake from `transport`.
+    pub async fn handshake<R: AsyncReadExt + Unpin>(
+        &mut self,
+        transport: &mut R
+    ) -> Result<(), AdnlError> {
+        let mut length = [0u8; 4];
+        log::debug!("reading length");
+        transport
+            .read_exact(&mut length).await
+            .map_err(AdnlError::ReadError)?;
+        self.aes.apply_keystream(&mut length);
+        let length = u32::from_le_bytes(length);
+        log::debug!("length = {}", length);
+        if length < 64 {
+            return Err(AdnlError::TooShortPacket);
+        }
+
+        let mut hasher = Sha256::new();
+
+        // read nonce
+        let mut nonce = [0u8; 32];
+        log::debug!("reading nonce");
+        transport
+            .read_exact(&mut nonce).await
+            .map_err(AdnlError::ReadError)?;
+        self.aes.apply_keystream(&mut nonce);
+        hasher.update(nonce);
+
+        let mut given_hash = [0u8; 32];
+        log::debug!("reading hash");
+        transport
+            .read_exact(&mut given_hash).await
+            .map_err(AdnlError::ReadError)?;
+        self.aes.apply_keystream(&mut given_hash);
+
+        let real_hash = hasher.finalize();
+        if real_hash.as_slice() != given_hash {
+            return Err(AdnlError::IntegrityError);
+        }
+
+        log::debug!("handshake finished successfully");
+
+        Ok(())
+    }
 
     /// Receive datagram from `transport`. Received parts of the decrypted buffer
     /// will be sent to `consumer`, which usually can be just `Vec`. Note that
