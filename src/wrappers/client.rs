@@ -13,6 +13,7 @@ pub struct AdnlClient<T: AsyncReadExt + AsyncWriteExt> {
 
 impl AdnlClient<TcpStream> {
     /// Create ADNL client use random private key and random AES params
+    #[cfg(feature = "dalek")]
     pub async fn connect<P: AdnlPublicKey>(
         ls_public: P,
         ls_ip: &str,
@@ -56,19 +57,38 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
         client.receiver.receive::<_, _, 0>(&mut client.transport, &mut empty).await?;
         Ok(client)
     }
+    
+    /// Send `data` to another peer with random nonce
+    pub async fn send(
+        &mut self,
+        data: &mut [u8],
+    ) -> Result<(), AdnlError> {
+        self.sender.send(&mut self.transport, &mut rand::random(), data).await
+    }
 
     /// Send `data` to another peer. Random `nonce` must be provided to eliminate bit-flipping attacks.
-    pub async fn send(
+    pub async fn send_with_nonce(
         &mut self,
         data: &mut [u8],
         nonce: &mut [u8; 32],
     ) -> Result<(), AdnlError> {
         self.sender.send(&mut self.transport, nonce, data).await
     }
+    
+    
+    /// Receive data from another peer into `consumer` which will process the data with 
+    /// a `BUFFER` size of 8126 bytes.
+    pub async fn receive<C: AsyncWriteExt + Unpin>(
+        &mut self,
+        consumer: &mut C,
+    ) -> Result<(), AdnlError> {
+        self.receiver
+            .receive::<_, _, 8192>(&mut self.transport, consumer).await
+    }
 
     /// Receive data from another peer into `consumer` which will process the data. Set `BUFFER`
     /// according to your memory requirements, recommended size is 8192 bytes.
-    pub async fn receive<C: AsyncWriteExt + Unpin, const BUFFER: usize>(
+    pub async fn receive_with_buffer<C: AsyncWriteExt + Unpin, const BUFFER: usize>(
         &mut self,
         consumer: &mut C,
     ) -> Result<(), AdnlError> {

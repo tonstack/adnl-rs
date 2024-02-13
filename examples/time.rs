@@ -18,11 +18,11 @@ async fn main() -> Result<()> {
     let mut query = hex::decode("7af98bb435263e6c95d6fecb497dfd0aa5f031e7d412986b5ce720496db512052e8f2d100cdf068c7904345aad16000000000000")?;
 
     // send over ADNL, use random nonce
-    client.send(&mut query, &mut rand::random()).await?;
+    client.send(&mut query).await?;
 
     // receive result into vector, use 8192 bytes buffer
     let mut result = Vec::<u8>::new();
-    client.receive::<_, 8192>(&mut result).await?;
+    client.receive(&mut result).await?;
 
     // get time from serialized TL answer
     println!(
