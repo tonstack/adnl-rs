@@ -1,5 +1,4 @@
 use std::net::SocketAddrV4;
-use anyhow::{anyhow, Context};
 use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPublicKey, AdnlReceiver, AdnlSender};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, empty};
 use tokio::net::TcpStream;
@@ -14,27 +13,22 @@ pub struct AdnlClient<T: AsyncReadExt + AsyncWriteExt> {
 
 impl AdnlClient<TcpStream> {
     /// Create ADNL client use random private key and random AES params
-    pub async fn connect(
-        ls_public: &str,
+    pub async fn connect<P: AdnlPublicKey>(
+        ls_public: P,
         ls_ip: &str,
         ls_port: u16,
-    ) -> anyhow::Result<AdnlClient<TcpStream>> {
-        // decode liteserver public key
-        let remote_public: [u8; 32] = base64::decode(ls_public)
-            .context("Error decode base64")?
-            .try_into().map_err(|_| anyhow!("Bad public key length"))?;
-
+    ) -> Result<AdnlClient<TcpStream>, AdnlError> {
         // generate private key
         let local_secret = StaticSecret::new(rand::rngs::OsRng);
 
         // use TcpStream as transport for our ADNL connection
-        let transport = TcpStream::connect(SocketAddrV4::new(ls_ip.parse()?, ls_port)).await
-            .context("Connection error")?;
+        let ip = ls_ip.parse().map_err(AdnlError::IncorrectAddr)?;
+        let transport = TcpStream::connect(SocketAddrV4::new(ip, ls_port)).await?;
 
         // build handshake using random session keys, encrypt it with ECDH(local_secret, remote_public)
         // then perform handshake over our TcpStream
         let client = AdnlBuilder::with_random_aes_params(&mut rand::rngs::OsRng)
-            .perform_ecdh(local_secret, remote_public)
+            .perform_ecdh(local_secret, ls_public)
             .perform_handshake(transport).await?;
         Ok(client)
     }

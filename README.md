@@ -15,13 +15,17 @@ Run this example: `cargo run --example time`
 
 ```rust
 use adnl::AdnlClient;
-use anyhow::Result;
+use anyhow::{anyhow, Context, Result};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // decode liteserver public key
+    let remote_public: [u8; 32] = base64::decode("JhXt7H1dZTgxQTIyGiYV4f9VUARuDxFl/1kVBjLSMB8=")
+        .context("Error decode base64")?
+        .try_into().map_err(|_| anyhow!("Bad public key length"))?;
     // create AdnlClient
     let mut client = AdnlClient::connect(
-        "JhXt7H1dZTgxQTIyGiYV4f9VUARuDxFl/1kVBjLSMB8=",
+        remote_public,
         "65.21.74.140",
         46427,
     ).await?;

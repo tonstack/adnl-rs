@@ -1,4 +1,5 @@
 use std::io::Error;
+use std::net::AddrParseError;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
@@ -158,6 +159,8 @@ pub enum AdnlError {
     IntegrityError,
     #[error("TooShortPacket error")]
     TooShortPacket,
+    #[error("Incorrect ip address")]
+    IncorrectAddr(AddrParseError),
     #[error(transparent)]
     OtherError(#[from] Error)
 }
