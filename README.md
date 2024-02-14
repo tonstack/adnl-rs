@@ -1,12 +1,14 @@
 # ADNL
 
-Minimal ADNL implementation in Rust (client-server only, without p2p for now). Specification of ADNL is available [here](https://github.com/tonstack/ton-docs/blob/main/ADNL/README.md).
+[![crates.io](https://img.shields.io/crates/v/adnl.svg)](https://crates.io/crates/adnl)
+[![documentation](https://docs.rs/adnl/badge.svg)](https://docs.rs/adnl)
+
+Minimal client-server ADNL implementation in Rust. Specification of ADNL is available [here](https://github.com/tonstack/ton-docs/blob/main/ADNL/README.md).
 
 | Feature      | Status                          |
 |--------------|---------------------------------|
 | ADNL Client  | ✅ Implemented                   |
 | ADNL Server  | ❌ Not implemented               |
-| ADNL P2P     | ❌ Not implemented               |
 | async        | ✅ Implemented                   |
 | ed25519 libs | curve25519_dalek + x25519_dalek |
 
