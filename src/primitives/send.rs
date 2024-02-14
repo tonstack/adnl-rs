@@ -39,7 +39,7 @@ impl AdnlSender {
         let mut hasher = Sha256::new();
         hasher.update(*nonce);
         hasher.update(&*buffer);
-        let mut hash: [u8; 32] = hasher.finalize().try_into().unwrap();
+        let mut hash: [u8; 32] = hasher.finalize().into();
 
         // encrypt packet
         self.aes.apply_keystream(&mut length);
@@ -49,16 +49,20 @@ impl AdnlSender {
 
         // write to transport
         transport
-            .write_all(&length).await
+            .write_all(&length)
+            .await
             .map_err(AdnlError::WriteError)?;
         transport
-            .write_all(nonce).await
+            .write_all(nonce)
+            .await
             .map_err(AdnlError::WriteError)?;
         transport
-            .write_all(buffer).await
+            .write_all(buffer)
+            .await
             .map_err(AdnlError::WriteError)?;
         transport
-            .write_all(&hash).await
+            .write_all(&hash)
+            .await
             .map_err(AdnlError::WriteError)?;
         transport.flush().await.map_err(AdnlError::WriteError)?;
 

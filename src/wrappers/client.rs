@@ -1,5 +1,5 @@
 use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPublicKey, AdnlReceiver, AdnlSender};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, empty};
+use tokio::io::{empty, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use x25519_dalek::StaticSecret;
 
@@ -27,13 +27,13 @@ impl AdnlClient<TcpStream> {
         // then perform handshake over our TcpStream
         let client = AdnlBuilder::with_random_aes_params(&mut rand::rngs::OsRng)
             .perform_ecdh(local_secret, ls_public)
-            .perform_handshake(transport).await?;
+            .perform_handshake(transport)
+            .await?;
         Ok(client)
     }
 }
 
 impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
-
     /// Send `handshake` over `transport` and check that handshake was successful
     pub async fn perform_handshake<P: AdnlPublicKey>(
         mut transport: T,
@@ -41,7 +41,8 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
     ) -> Result<Self, AdnlError> {
         // send handshake
         transport
-            .write_all(&handshake.to_bytes()).await
+            .write_all(&handshake.to_bytes())
+            .await
             .map_err(AdnlError::WriteError)?;
 
         // receive empty message to ensure that server knows our AES keys
@@ -51,16 +52,21 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
             transport,
         };
         let mut empty = empty();
-        client.receiver.receive::<_, _, 0>(&mut client.transport, &mut empty).await?;
+        client
+            .receiver
+            .receive::<_, _, 0>(&mut client.transport, &mut empty)
+            .await?;
         Ok(client)
     }
-    
+
     /// Send `data` to another peer with random nonce
     pub async fn send(
         &mut self,
         data: &mut [u8],
     ) -> Result<(), AdnlError> {
-        self.sender.send(&mut self.transport, &mut rand::random(), data).await
+        self.sender
+            .send(&mut self.transport, &mut rand::random(), data)
+            .await
     }
 
     /// Send `data` to another peer. Random `nonce` must be provided to eliminate bit-flipping attacks.
@@ -71,8 +77,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
     ) -> Result<(), AdnlError> {
         self.sender.send(&mut self.transport, nonce, data).await
     }
-    
-    
+
     /// Receive data from another peer into `consumer` which will process the data with 
     /// a `BUFFER` size of 8192 bytes.
     pub async fn receive<C: AsyncWriteExt + Unpin>(
@@ -80,7 +85,8 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
         consumer: &mut C,
     ) -> Result<(), AdnlError> {
         self.receiver
-            .receive::<_, _, 8192>(&mut self.transport, consumer).await
+            .receive::<_, _, 8192>(&mut self.transport, consumer)
+            .await
     }
 
     /// Receive data from another peer into `consumer` which will process the data. Set `BUFFER`
@@ -90,6 +96,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
         consumer: &mut C,
     ) -> Result<(), AdnlError> {
         self.receiver
-            .receive::<_, _, BUFFER>(&mut self.transport, consumer).await
+            .receive::<_, _, BUFFER>(&mut self.transport, consumer)
+            .await
     }
 }

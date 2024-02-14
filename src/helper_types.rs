@@ -1,6 +1,6 @@
+use sha2::{Digest, Sha256};
 use std::io::Error;
 use std::net::AddrParseError;
-use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
@@ -12,7 +12,7 @@ pub trait AdnlPublicKey {
         let mut hasher = Sha256::new();
         hasher.update([0xc6, 0xb4, 0x13, 0x48]); // type id - always ed25519
         hasher.update(self.to_bytes());
-        AdnlAddress(hasher.finalize().try_into().unwrap())
+        AdnlAddress(hasher.finalize().into())
     }
 
     fn to_bytes(&self) -> [u8; 32];
@@ -162,5 +162,5 @@ pub enum AdnlError {
     #[error("Incorrect ip address")]
     IncorrectAddr(AddrParseError),
     #[error(transparent)]
-    OtherError(#[from] Error)
+    OtherError(#[from] Error),
 }

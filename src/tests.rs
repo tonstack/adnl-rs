@@ -89,7 +89,9 @@ async fn test_send(aes_params: Vec<u8>, nonce: Vec<u8>, buffer: Vec<u8>, expecte
     let aes_params = AdnlAesParams::from(aes_params);
     let mut protocol_client = AdnlSender::new(&aes_params);
     let mut packet = Vec::<u8>::new();
-    let _result = protocol_client.send(&mut packet, &mut nonce, &mut buffer).await;
+    let _result = protocol_client
+        .send(&mut packet, &mut nonce, &mut buffer)
+        .await;
     assert_eq!(
         packet.as_slice(),
         &expected_packet,

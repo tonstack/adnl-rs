@@ -14,9 +14,10 @@ Minimal ADNL implementation in Rust (client-server only, without p2p for now). S
 Run this example: `cargo run --example time`
 
 ```rust
-use std::net::SocketAddrV4;
 use adnl::AdnlClient;
 use anyhow::{anyhow, Context, Result};
+use std::net::SocketAddrV4;
+
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -28,10 +29,8 @@ async fn main() -> Result<()> {
     let ls_ip = "65.21.74.140";
     let ls_port = 46427;
     // create AdnlClient
-    let mut client = AdnlClient::connect(
-        remote_public,
-        SocketAddrV4::new(ls_ip.parse()?, ls_port)
-    ).await?;
+    let mut client =
+        AdnlClient::connect(remote_public, SocketAddrV4::new(ls_ip.parse()?, ls_port)).await?;
 
     // already serialized TL with gettime query
     let mut query = hex::decode("7af98bb435263e6c95d6fecb497dfd0aa5f031e7d412986b5ce720496db512052e8f2d100cdf068c7904345aad16000000000000")?;
@@ -50,5 +49,4 @@ async fn main() -> Result<()> {
     );
     Ok(())
 }
-
 ```

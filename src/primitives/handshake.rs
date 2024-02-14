@@ -44,7 +44,7 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
         let mut raw_params = self.aes_params.to_bytes();
         let mut hasher = Sha256::new();
         hasher.update(raw_params);
-        let hash: [u8; 32] = hasher.finalize().try_into().unwrap();
+        let hash: [u8; 32] = hasher.finalize().into();
 
         let mut key = [0u8; 32];
         key[..16].copy_from_slice(&self.secret.as_bytes()[..16]);
