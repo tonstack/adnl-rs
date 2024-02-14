@@ -60,10 +60,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
     }
 
     /// Send `data` to another peer with random nonce
-    pub async fn send(
-        &mut self,
-        data: &mut [u8],
-    ) -> Result<(), AdnlError> {
+    pub async fn send(&mut self, data: &mut [u8]) -> Result<(), AdnlError> {
         self.sender
             .send(&mut self.transport, &mut rand::random(), data)
             .await
@@ -78,7 +75,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
         self.sender.send(&mut self.transport, nonce, data).await
     }
 
-    /// Receive data from another peer into `consumer` which will process the data with 
+    /// Receive data from another peer into `consumer` which will process the data with
     /// a `BUFFER` size of 8192 bytes.
     pub async fn receive<C: AsyncWriteExt + Unpin>(
         &mut self,

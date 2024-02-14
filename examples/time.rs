@@ -2,13 +2,13 @@ use adnl::AdnlClient;
 use anyhow::{anyhow, Context, Result};
 use std::net::SocketAddrV4;
 
-
 #[tokio::main]
 async fn main() -> Result<()> {
     // decode liteserver public key
     let remote_public: [u8; 32] = base64::decode("JhXt7H1dZTgxQTIyGiYV4f9VUARuDxFl/1kVBjLSMB8=")
         .context("Error decode base64")?
-        .try_into().map_err(|_| anyhow!("Bad public key length"))?;
+        .try_into()
+        .map_err(|_| anyhow!("Bad public key length"))?;
 
     let ls_ip = "65.21.74.140";
     let ls_port = 46427;
