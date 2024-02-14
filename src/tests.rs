@@ -89,7 +89,7 @@ async fn test_send(aes_params: Vec<u8>, nonce: Vec<u8>, buffer: Vec<u8>, expecte
     let aes_params = AdnlAesParams::from(aes_params);
     let mut protocol_client = AdnlSender::new(&aes_params);
     let mut packet = Vec::<u8>::new();
-    let _result = protocol_client.send_with_nonce(&mut packet, &mut nonce, &mut buffer).await;
+    let _result = protocol_client.send(&mut packet, &mut nonce, &mut buffer).await;
     assert_eq!(
         packet.as_slice(),
         &expected_packet,
@@ -128,6 +128,6 @@ async fn test_recv_2() {
 async fn test_recv(client: &mut AdnlReceiver, encrypted_packet: Vec<u8>, expected_data: Vec<u8>) {
     let mut data = Vec::<u8>::new();
     let mut binding = encrypted_packet.as_slice();
-    let _r = client.receive_with_buffer::<_, _, 8192>(&mut binding, &mut data).await;
+    let _r = client.receive::<_, _, 8192>(&mut binding, &mut data).await;
     assert_eq!(data, expected_data.as_slice(), "incoming packet is wrong");
 }
