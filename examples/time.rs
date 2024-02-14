@@ -1,3 +1,4 @@
+use std::net::SocketAddrV4;
 use adnl::AdnlClient;
 use anyhow::{anyhow, Context, Result};
 
@@ -7,11 +8,13 @@ async fn main() -> Result<()> {
     let remote_public: [u8; 32] = base64::decode("JhXt7H1dZTgxQTIyGiYV4f9VUARuDxFl/1kVBjLSMB8=")
         .context("Error decode base64")?
         .try_into().map_err(|_| anyhow!("Bad public key length"))?;
+
+    let ls_ip = "65.21.74.140";
+    let ls_port = 46427;
     // create AdnlClient
     let mut client = AdnlClient::connect(
         remote_public,
-        "65.21.74.140",
-        46427,
+        SocketAddrV4::new(ls_ip.parse()?, ls_port)
     ).await?;
 
     // already serialized TL with gettime query

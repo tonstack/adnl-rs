@@ -1,7 +1,6 @@
-use std::net::SocketAddrV4;
 use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPublicKey, AdnlReceiver, AdnlSender};
 use tokio::io::{AsyncReadExt, AsyncWriteExt, empty};
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, ToSocketAddrs};
 use x25519_dalek::StaticSecret;
 
 /// Abstraction over [`AdnlSender`] and [`AdnlReceiver`] to keep things simple
@@ -14,17 +13,15 @@ pub struct AdnlClient<T: AsyncReadExt + AsyncWriteExt> {
 impl AdnlClient<TcpStream> {
     /// Create ADNL client use random private key and random AES params
     #[cfg(feature = "dalek")]
-    pub async fn connect<P: AdnlPublicKey>(
+    pub async fn connect<P: AdnlPublicKey, A: ToSocketAddrs>(
         ls_public: P,
-        ls_ip: &str,
-        ls_port: u16,
+        ls_addr: A,
     ) -> Result<AdnlClient<TcpStream>, AdnlError> {
         // generate private key
         let local_secret = StaticSecret::new(rand::rngs::OsRng);
 
         // use TcpStream as transport for our ADNL connection
-        let ip = ls_ip.parse().map_err(AdnlError::IncorrectAddr)?;
-        let transport = TcpStream::connect(SocketAddrV4::new(ip, ls_port)).await?;
+        let transport = TcpStream::connect(ls_addr).await?;
 
         // build handshake using random session keys, encrypt it with ECDH(local_secret, remote_public)
         // then perform handshake over our TcpStream
@@ -77,7 +74,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
     
     
     /// Receive data from another peer into `consumer` which will process the data with 
-    /// a `BUFFER` size of 8126 bytes.
+    /// a `BUFFER` size of 8192 bytes.
     pub async fn receive<C: AsyncWriteExt + Unpin>(
         &mut self,
         consumer: &mut C,
