@@ -1,9 +1,9 @@
 use crate::primitives::AdnlAes;
-use crate::{AdnlAesParams, AdnlError, Empty};
+use crate::{AdnlAesParams, AdnlError};
 use aes::cipher::KeyIvInit;
-use ciborium_io::{Read, Write};
 use ctr::cipher::StreamCipher;
 use sha2::{Digest, Sha256};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Low-level incoming datagram processor
 pub struct AdnlReceiver {
@@ -25,17 +25,18 @@ impl AdnlReceiver {
     ///
     /// You can adjust `BUFFER` according to your memory requirements.
     /// Recommended size is 8192 bytes.
-    pub fn receive<R: Read, C: Write, const BUFFER: usize>(
+    pub async fn receive<R: AsyncReadExt + Unpin, C: AsyncWriteExt + Unpin, const BUFFER: usize>(
         &mut self,
         transport: &mut R,
         consumer: &mut C,
-    ) -> Result<(), AdnlError<R, Empty, C>> {
+    ) -> Result<(), AdnlError> {
         // read length
         let mut length = [0u8; 4];
         log::debug!("reading length");
         transport
             .read_exact(&mut length)
-            .map_err(|e| AdnlError::ReadError(e))?;
+            .await
+            .map_err(AdnlError::ReadError)?;
         self.aes.apply_keystream(&mut length);
         let length = u32::from_le_bytes(length);
         log::debug!("length = {}", length);
@@ -50,7 +51,8 @@ impl AdnlReceiver {
         log::debug!("reading nonce");
         transport
             .read_exact(&mut nonce)
-            .map_err(|e| AdnlError::ReadError(e))?;
+            .await
+            .map_err(AdnlError::ReadError)?;
         self.aes.apply_keystream(&mut nonce);
         hasher.update(nonce);
 
@@ -66,12 +68,14 @@ impl AdnlReceiver {
                 );
                 transport
                     .read_exact(&mut buffer)
-                    .map_err(|e| AdnlError::ReadError(e))?;
+                    .await
+                    .map_err(AdnlError::ReadError)?;
                 self.aes.apply_keystream(&mut buffer);
                 hasher.update(buffer);
                 consumer
                     .write_all(&buffer)
-                    .map_err(|e| AdnlError::ConsumeError(e))?;
+                    .await
+                    .map_err(AdnlError::WriteError)?;
                 bytes_to_read -= BUFFER;
             }
 
@@ -81,12 +85,14 @@ impl AdnlReceiver {
                 let buffer = &mut buffer[..bytes_to_read];
                 transport
                     .read_exact(buffer)
-                    .map_err(|e| AdnlError::ReadError(e))?;
+                    .await
+                    .map_err(AdnlError::ReadError)?;
                 self.aes.apply_keystream(buffer);
                 hasher.update(&buffer);
                 consumer
                     .write_all(buffer)
-                    .map_err(|e| AdnlError::ConsumeError(e))?;
+                    .await
+                    .map_err(AdnlError::WriteError)?;
             }
         }
 
@@ -94,7 +100,8 @@ impl AdnlReceiver {
         log::debug!("reading hash");
         transport
             .read_exact(&mut given_hash)
-            .map_err(|e| AdnlError::ReadError(e))?;
+            .await
+            .map_err(AdnlError::ReadError)?;
         self.aes.apply_keystream(&mut given_hash);
 
         let real_hash = hasher.finalize();

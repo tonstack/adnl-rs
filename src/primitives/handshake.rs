@@ -1,9 +1,9 @@
 use crate::primitives::AdnlAes;
-use crate::{AdnlAddress, AdnlAesParams, AdnlClient, AdnlError, AdnlPublicKey, AdnlSecret, Empty};
+use crate::{AdnlAddress, AdnlAesParams, AdnlClient, AdnlError, AdnlPublicKey, AdnlSecret};
 use aes::cipher::KeyIvInit;
-use ciborium_io::{Read, Write};
 use ctr::cipher::StreamCipher;
 use sha2::{Digest, Sha256};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Handshake packet, must be sent from client to server prior to any datagrams
 pub struct AdnlHandshake<P: AdnlPublicKey> {
@@ -44,7 +44,7 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
         let mut raw_params = self.aes_params.to_bytes();
         let mut hasher = Sha256::new();
         hasher.update(raw_params);
-        let hash: [u8; 32] = hasher.finalize().try_into().unwrap();
+        let hash: [u8; 32] = hasher.finalize().into();
 
         let mut key = [0u8; 32];
         key[..16].copy_from_slice(&self.secret.as_bytes()[..16]);
@@ -62,10 +62,10 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
     }
 
     /// Send handshake over the given transport, build [`AdnlClient`] on top of it
-    pub fn perform_handshake<T: Read + Write>(
+    pub async fn perform_handshake<T: AsyncReadExt + AsyncWriteExt + Unpin>(
         &self,
         transport: T,
-    ) -> Result<AdnlClient<T>, AdnlError<T, T, Empty>> {
-        AdnlClient::perform_handshake(transport, self)
+    ) -> Result<AdnlClient<T>, AdnlError> {
+        AdnlClient::perform_handshake(transport, self).await
     }
 }

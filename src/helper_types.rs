@@ -1,5 +1,7 @@
-use ciborium_io::{Read, Write};
 use sha2::{Digest, Sha256};
+use std::io::Error;
+use std::net::AddrParseError;
+use thiserror::Error;
 
 pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
 
@@ -10,7 +12,7 @@ pub trait AdnlPublicKey {
         let mut hasher = Sha256::new();
         hasher.update([0xc6, 0xb4, 0x13, 0x48]); // type id - always ed25519
         hasher.update(self.to_bytes());
-        AdnlAddress(hasher.finalize().try_into().unwrap())
+        AdnlAddress(hasher.finalize().into())
     }
 
     fn to_bytes(&self) -> [u8; 32];
@@ -144,36 +146,21 @@ impl AdnlSecret {
     }
 }
 
-/// Empty transport to use when there is nothing to read or write
-#[derive(Debug)]
-pub struct Empty;
-
-impl Write for Empty {
-    type Error = ();
-
-    fn write_all(&mut self, _data: &[u8]) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn flush(&mut self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
-impl Read for Empty {
-    type Error = ();
-
-    fn read_exact(&mut self, _data: &mut [u8]) -> Result<(), Self::Error> {
-        Ok(())
-    }
-}
-
 /// Common error type
-#[derive(Debug)]
-pub enum AdnlError<R: Read, W: Write, C: Write> {
-    ReadError(R::Error),
-    WriteError(W::Error),
-    ConsumeError(C::Error),
+#[derive(Debug, Error)]
+pub enum AdnlError {
+    #[error("Read error")]
+    ReadError(Error),
+    #[error("Write error")]
+    WriteError(Error),
+    #[error("Consume error")]
+    ConsumeError(Error),
+    #[error("Integrity error")]
     IntegrityError,
+    #[error("TooShortPacket error")]
     TooShortPacket,
+    #[error("Incorrect ip address")]
+    IncorrectAddr(AddrParseError),
+    #[error(transparent)]
+    OtherError(#[from] Error),
 }

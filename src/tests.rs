@@ -62,34 +62,36 @@ fn test_handshake(
     );
 }
 
-#[test]
-fn test_send_1() {
+#[tokio::test]
+async fn test_send_1() {
     let aes_params = hex::decode("b3d529e34b839a521518447b68343aebaae9314ac95aaacfdb687a2163d1a98638db306b63409ef7bc906b4c9dc115488cf90dfa964f520542c69e1a4a495edf9ae9ee72023203c8b266d552f251e8d724929733428c8e276ab3bd6291367336a6ab8dc3d36243419bd0b742f76691a5dec14edbd50f7c1b58ec961ae45be58cbf6623f3ec9705bd5d227761ec79cee377e2566ff668f863552bddfd6ff3a16b").unwrap();
     let nonce =
         hex::decode("9a5ecd5d9afdfff2823e7520fa1c338f2baf1a21f51e6fdab0491d45a50066f7").unwrap();
     let buffer = hex::decode("7af98bb471ff48e9b263959b17a04faae4a23501380d2aa932b09eac6f9846fcbae9bbcb0cdf068c7904345aad16000000000000").unwrap();
     let expected_packet = hex::decode("250d70d08526791bc2b6278ded7bf2b051afb441b309dda06f76e4419d7c31d4d5baafc4ff71e0ebabe246d4ea19e3e579bd15739c8fc916feaf46ea7a6bc562ed1cf87c9bf4220eb037b9a0b58f663f0474b8a8b18fa24db515e41e4b02e509d8ef261a27ba894cbbecc92e59fc44bf5ff7c8281cb5e900").unwrap();
-    test_send(aes_params, nonce, buffer, expected_packet);
+    test_send(aes_params, nonce, buffer, expected_packet).await;
 }
 
-#[test]
-fn test_send_2() {
+#[tokio::test]
+async fn test_send_2() {
     let aes_params = hex::decode("7e3c66de7c64d4bee4368e69560101991db4b084430a336cffe676c9ac0a795d8c98367309422a8e927e62ed657ba3eaeeb6acd3bbe5564057dfd1d60609a25a48963cbb7d14acf4fc83ec59254673bc85be22d04e80e7b83c641d37cae6e1d82a400bf159490bbc0048e69234ad89e999d792eefdaa56734202546d9188706e95e1272267206a8e7ee1f7c077f76bd26e494972e34d72e257bf20364dbf39b0").unwrap();
     let nonce =
         hex::decode("d36d0683da23e62910fa0e8a9331dfc257db4cde0ba8d63893e88ac4de7d8d6c").unwrap();
     let buffer = hex::decode("7af98bb47bcae111ea0e56457826b1aec7f0f59b9b6579678b3db3839d17b63eb60174f20cdf068c7904345aad16000000000000").unwrap();
     let expected_packet = hex::decode("24c709a0f676750ddaeafc8564d84546bfc831af27fb66716de382a347a1c32adef1a27e597c8a07605a09087fff32511d314970cad3983baefff01e7ee51bb672b17f7914a6d3f229a13acb14cdc14d98beae8a1e96510756726913541f558c2ffac63ed6cb076d0e888c3c0bb014d9f229c2a3f62e0847").unwrap();
-    test_send(aes_params, nonce, buffer, expected_packet);
+    test_send(aes_params, nonce, buffer, expected_packet).await;
 }
 
-fn test_send(aes_params: Vec<u8>, nonce: Vec<u8>, buffer: Vec<u8>, expected_packet: Vec<u8>) {
+async fn test_send(aes_params: Vec<u8>, nonce: Vec<u8>, buffer: Vec<u8>, expected_packet: Vec<u8>) {
     let mut nonce = nonce.try_into().unwrap();
     let mut buffer = buffer;
     let aes_params: [u8; 160] = aes_params.try_into().unwrap();
     let aes_params = AdnlAesParams::from(aes_params);
     let mut protocol_client = AdnlSender::new(&aes_params);
     let mut packet = Vec::<u8>::new();
-    let _result = protocol_client.send(&mut packet, &mut nonce, &mut buffer);
+    let _result = protocol_client
+        .send(&mut packet, &mut nonce, &mut buffer)
+        .await;
     assert_eq!(
         packet.as_slice(),
         &expected_packet,
@@ -97,36 +99,37 @@ fn test_send(aes_params: Vec<u8>, nonce: Vec<u8>, buffer: Vec<u8>, expected_pack
     );
 }
 
-#[test]
-fn test_recv_1() {
+#[tokio::test]
+async fn test_recv_1() {
     let encrypted_data = hex::decode("81e95e433c87c9ad2a716637b3a12644fbfb12dbd02996abc40ed2beb352483d6ecf9e2ad181a5abde4d4146ca3a8524739d3acebb2d7599cc6b81967692a62118997e16").unwrap();
     let expected_data = Vec::new();
     let aes_params = hex::decode("b3d529e34b839a521518447b68343aebaae9314ac95aaacfdb687a2163d1a98638db306b63409ef7bc906b4c9dc115488cf90dfa964f520542c69e1a4a495edf9ae9ee72023203c8b266d552f251e8d724929733428c8e276ab3bd6291367336a6ab8dc3d36243419bd0b742f76691a5dec14edbd50f7c1b58ec961ae45be58cbf6623f3ec9705bd5d227761ec79cee377e2566ff668f863552bddfd6ff3a16b").unwrap();
     let aes_params: [u8; 160] = aes_params.try_into().unwrap();
     let aes_params = AdnlAesParams::from(aes_params);
     let mut protocol_client = AdnlReceiver::new(&aes_params);
-    test_recv(&mut protocol_client, encrypted_data, expected_data);
+    test_recv(&mut protocol_client, encrypted_data, expected_data).await;
     let encrypted_data = hex::decode("4b72a32bf31894cce9ceffd2dd97176e502946524e45e62689bd8c5d31ad53603c5fd3b402771f707cd2747747fad9df52e6c23ceec9fa2ee5b0f68b61c33c7790db03d1c593798a29d716505cea75acdf0e031c25447c55c4d29d32caab29bd5a0787644843bafc04160c92140aab0ecc990927").unwrap();
     let expected_data = hex::decode("1684ac0f71ff48e9b263959b17a04faae4a23501380d2aa932b09eac6f9846fcbae9bbcb080d0053e9a3ac3062000000").unwrap();
-    test_recv(&mut protocol_client, encrypted_data, expected_data);
+    test_recv(&mut protocol_client, encrypted_data, expected_data).await;
 }
 
-#[test]
-fn test_recv_2() {
+#[tokio::test]
+async fn test_recv_2() {
     let encrypted_data = hex::decode("b75dcf27582beb4031d6d3700c9b7925bf84a78f2bd16b186484d36427a8824ac86e27cea81eb5bcbac447a37269845c65be51babd11c80627f81b4247f84df16d05c4f1").unwrap();
     let expected_data = Vec::new();
     let aes_params = hex::decode("7e3c66de7c64d4bee4368e69560101991db4b084430a336cffe676c9ac0a795d8c98367309422a8e927e62ed657ba3eaeeb6acd3bbe5564057dfd1d60609a25a48963cbb7d14acf4fc83ec59254673bc85be22d04e80e7b83c641d37cae6e1d82a400bf159490bbc0048e69234ad89e999d792eefdaa56734202546d9188706e95e1272267206a8e7ee1f7c077f76bd26e494972e34d72e257bf20364dbf39b0").unwrap();
     let aes_params: [u8; 160] = aes_params.try_into().unwrap();
     let aes_params = AdnlAesParams::from(aes_params);
     let mut protocol_client = AdnlReceiver::new(&aes_params);
-    test_recv(&mut protocol_client, encrypted_data, expected_data);
+    test_recv(&mut protocol_client, encrypted_data, expected_data).await;
     let encrypted_data = hex::decode("77ebea5a6e6c8758e7703d889abad16e7e3c4e0c10c4e81ca10d0d9abddabb6f008905133a070ff825ad3f4b0ae969e04dbd8b280864d3d2175f3bc7cf3deb31de5497fa43997d8e2acafb9a31de2a22ecb279b5854c00791216e39c2e65863539d82716fc020e9647b2dd99d0f14e4f553b645f").unwrap();
     let expected_data = hex::decode("1684ac0f7bcae111ea0e56457826b1aec7f0f59b9b6579678b3db3839d17b63eb60174f2080d0053e90bb03062000000").unwrap();
-    test_recv(&mut protocol_client, encrypted_data, expected_data);
+    test_recv(&mut protocol_client, encrypted_data, expected_data).await;
 }
 
-fn test_recv(client: &mut AdnlReceiver, encrypted_packet: Vec<u8>, expected_data: Vec<u8>) {
+async fn test_recv(client: &mut AdnlReceiver, encrypted_packet: Vec<u8>, expected_data: Vec<u8>) {
     let mut data = Vec::<u8>::new();
-    let _r = client.receive::<_, _, 8192>(&mut encrypted_packet.as_slice(), &mut data);
+    let mut binding = encrypted_packet.as_slice();
+    let _r = client.receive::<_, _, 8192>(&mut binding, &mut data).await;
     assert_eq!(data, expected_data.as_slice(), "incoming packet is wrong");
 }

@@ -1,10 +1,10 @@
 use aes::cipher::KeyIvInit;
-use ciborium_io::Write;
 use ctr::cipher::StreamCipher;
 use sha2::{Digest, Sha256};
+use tokio::io::AsyncWriteExt;
 
 use crate::primitives::AdnlAes;
-use crate::{AdnlAesParams, AdnlError, Empty};
+use crate::{AdnlAesParams, AdnlError};
 
 /// Low-level outgoing datagram generator
 pub struct AdnlSender {
@@ -26,12 +26,12 @@ impl AdnlSender {
 
     /// Send `buffer` over `transport` with `nonce`. Note that `nonce` must be random
     /// in order to prevent bit-flipping attacks when an attacker knows whole plaintext in datagram.
-    pub fn send<W: Write>(
+    pub async fn send<W: AsyncWriteExt + Unpin>(
         &mut self,
         transport: &mut W,
         nonce: &mut [u8; 32],
         buffer: &mut [u8],
-    ) -> Result<(), AdnlError<Empty, W, Empty>> {
+    ) -> Result<(), AdnlError> {
         // remember not to send more than 4 GiB in a single packet
         let mut length = ((buffer.len() + 64) as u32).to_le_bytes();
 
@@ -39,7 +39,7 @@ impl AdnlSender {
         let mut hasher = Sha256::new();
         hasher.update(*nonce);
         hasher.update(&*buffer);
-        let mut hash: [u8; 32] = hasher.finalize().try_into().unwrap();
+        let mut hash: [u8; 32] = hasher.finalize().into();
 
         // encrypt packet
         self.aes.apply_keystream(&mut length);
@@ -50,17 +50,21 @@ impl AdnlSender {
         // write to transport
         transport
             .write_all(&length)
-            .map_err(|e| AdnlError::WriteError(e))?;
+            .await
+            .map_err(AdnlError::WriteError)?;
         transport
             .write_all(nonce)
-            .map_err(|e| AdnlError::WriteError(e))?;
+            .await
+            .map_err(AdnlError::WriteError)?;
         transport
             .write_all(buffer)
-            .map_err(|e| AdnlError::WriteError(e))?;
+            .await
+            .map_err(AdnlError::WriteError)?;
         transport
             .write_all(&hash)
-            .map_err(|e| AdnlError::WriteError(e))?;
-        transport.flush().map_err(|e| AdnlError::WriteError(e))?;
+            .await
+            .map_err(AdnlError::WriteError)?;
+        transport.flush().await.map_err(AdnlError::WriteError)?;
 
         Ok(())
     }
