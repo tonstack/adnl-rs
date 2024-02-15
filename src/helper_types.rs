@@ -41,7 +41,7 @@ pub trait AdnlPrivateKey {
 pub struct AdnlSecret([u8; 32]);
 
 /// Wrapper struct to hold ADNL address, which is a hash of public key
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 pub struct AdnlAddress([u8; 32]);
 
 impl From<[u8; 32]> for AdnlAddress {
@@ -169,7 +169,7 @@ pub enum AdnlError {
     #[error("Incorrect ip address")]
     IncorrectAddr(AddrParseError),
     #[error("Receiver ADNL address mismatch")]
-    AddrMismatch,
+    UnknownAddr(AdnlAddress),
     #[error(transparent)]
     OtherError(#[from] Error),
 }

@@ -48,18 +48,44 @@ fn test_handshake(
     aes_params: Vec<u8>,
     expected_handshake: Vec<u8>,
 ) {
-    let aes_params: [u8; 160] = aes_params.try_into().unwrap();
-    let aes_params = AdnlAesParams::from(aes_params);
+    // test serializing
+    let aes_params_raw: [u8; 160] = aes_params.try_into().unwrap();
+    let aes_params = AdnlAesParams::from(aes_params_raw);
     let remote_public: [u8; 32] = remote_public.try_into().unwrap();
     let local_public: [u8; 32] = local_public.try_into().unwrap();
-    let ecdh: [u8; 32] = ecdh.try_into().unwrap();
-    let ecdh = AdnlSecret::from(ecdh);
+    let ecdh_raw: [u8; 32] = ecdh.try_into().unwrap();
+    let ecdh = AdnlSecret::from(ecdh_raw);
     let handshake = AdnlHandshake::new(remote_public.address(), local_public, ecdh, aes_params);
     assert_eq!(
         handshake.to_bytes(),
         expected_handshake.as_slice(),
         "handshake is not the same!"
     );
+
+    // test deserializing
+    struct DummyKey {
+        ecdh: [u8; 32],
+        public: [u8; 32]
+    }
+
+    impl AdnlPrivateKey for DummyKey {
+        type PublicKey = [u8; 32];
+
+        fn key_agreement<P: AdnlPublicKey>(&self, _their_public: P) -> AdnlSecret {
+            AdnlSecret::from(self.ecdh)
+        }
+
+        fn public(&self) -> Self::PublicKey {
+            self.public
+        }
+    }
+
+    let key = DummyKey { ecdh: ecdh_raw, public: remote_public };
+    let handshake2 = AdnlHandshake::decrypt_from_raw(&expected_handshake, &key).expect("valid handshake");
+    assert_eq!(handshake2.aes_params().to_bytes(), aes_params_raw, "aes_params mismatch");
+    assert_eq!(handshake2.receiver(), &remote_public.address(), "receiver mismatch");
+    assert_eq!(handshake2.sender(), &local_public, "sender mismatch");
+    assert_eq!(&handshake2.to_bytes(), expected_handshake.as_slice(), "reencryption failed");
 }
 
 #[tokio::test]

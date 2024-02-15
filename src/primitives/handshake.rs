@@ -35,6 +35,16 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
         &self.aes_params
     }
 
+    /// Get initiator public key of this handshake
+    pub fn sender(&self) -> &P {
+        &self.sender
+    }
+
+    /// Get destination ADNL address of this handshake
+    pub fn receiver(&self) -> &AdnlAddress {
+        &self.receiver
+    }
+
     /// Serialize handshake to send it over the transport
     pub fn to_bytes(&self) -> [u8; 256] {
         let mut raw_params = self.aes_params.to_bytes();
@@ -79,7 +89,7 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
 
 impl AdnlHandshake<[u8; 32]> {
     /// Deserialize and decrypt handshake
-    pub fn decrypt_from_raw<S: AdnlPrivateKey>(packet: [u8; 256], key: S) -> Result<Self, AdnlError> {
+    pub fn decrypt_from_raw<S: AdnlPrivateKey>(packet: &[u8], key: &S) -> Result<Self, AdnlError> {
         let receiver: [u8; 32] = packet[..32].try_into().unwrap();
         let receiver = AdnlAddress::from(receiver);
         let sender = packet[32..64].try_into().unwrap();
@@ -87,7 +97,7 @@ impl AdnlHandshake<[u8; 32]> {
         let mut raw_params: [u8; 160] = packet[96..256].try_into().unwrap();
 
         if key.public().address() != receiver {
-            return Err(AdnlError::AddrMismatch)
+            return Err(AdnlError::UnknownAddr(receiver))
         }
 
         let secret = key.key_agreement(sender);
