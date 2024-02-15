@@ -41,7 +41,14 @@ pub trait AdnlPrivateKey {
 pub struct AdnlSecret([u8; 32]);
 
 /// Wrapper struct to hold ADNL address, which is a hash of public key
+#[derive(PartialEq)]
 pub struct AdnlAddress([u8; 32]);
+
+impl From<[u8; 32]> for AdnlAddress {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
 
 /// Session parameters for AES-CTR encryption of datagrams
 pub struct AdnlAesParams {
@@ -161,6 +168,8 @@ pub enum AdnlError {
     TooShortPacket,
     #[error("Incorrect ip address")]
     IncorrectAddr(AddrParseError),
+    #[error("Receiver ADNL address mismatch")]
+    AddrMismatch,
     #[error(transparent)]
     OtherError(#[from] Error),
 }
