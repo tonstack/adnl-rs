@@ -1,6 +1,5 @@
 use sha2::{Digest, Sha256};
-use std::io::Error;
-use std::net::AddrParseError;
+use std::{array::TryFromSliceError, io::Error};
 use thiserror::Error;
 
 pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
@@ -19,9 +18,26 @@ pub trait AdnlPublicKey {
 }
 
 /// Public key can be provided using raw slice
-impl AdnlPublicKey for [u8; 32] {
+#[derive(Clone)]
+pub struct AdnlRawPublicKey([u8; 32]);
+
+impl AdnlPublicKey for AdnlRawPublicKey {
     fn to_bytes(&self) -> [u8; 32] {
-        *self
+        self.0
+    }
+}
+
+impl From<[u8; 32]> for AdnlRawPublicKey {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
+
+impl TryFrom<&[u8]> for AdnlRawPublicKey {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into()?))
     }
 }
 
@@ -31,18 +47,25 @@ pub trait AdnlPrivateKey {
 
     /// Perform key agreement protocol (usually x25519) between our private key
     /// and their public
-    fn key_agreement<P: AdnlPublicKey>(&self, their_public: P) -> AdnlSecret;
+    fn key_agreement<P: AdnlPublicKey>(&self, their_public: &P) -> AdnlSecret;
 
     /// Get public key corresponding to this private
     fn public(&self) -> Self::PublicKey;
 }
 
 /// Wrapper struct to hold the secret, result of ECDH between peers
+#[derive(Clone)]
 pub struct AdnlSecret([u8; 32]);
 
 /// Wrapper struct to hold ADNL address, which is a hash of public key
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone)]
 pub struct AdnlAddress([u8; 32]);
+
+impl std::fmt::Debug for AdnlAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AdnlAddress").field(&format!("{:02x?}", &self.0)).finish()
+    }
+}
 
 impl From<[u8; 32]> for AdnlAddress {
     fn from(value: [u8; 32]) -> Self {
@@ -50,7 +73,16 @@ impl From<[u8; 32]> for AdnlAddress {
     }
 }
 
+impl TryFrom<&[u8]> for AdnlAddress {
+    type Error = TryFromSliceError;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        Ok(Self(value.try_into()?))
+    }
+}
+
 /// Session parameters for AES-CTR encryption of datagrams
+#[derive(Clone)]
 pub struct AdnlAesParams {
     rx_key: [u8; 32],
     tx_key: [u8; 32],
@@ -166,8 +198,6 @@ pub enum AdnlError {
     IntegrityError,
     #[error("TooShortPacket error")]
     TooShortPacket,
-    #[error("Incorrect ip address")]
-    IncorrectAddr(AddrParseError),
     #[error("Receiver ADNL address mismatch")]
     UnknownAddr(AdnlAddress),
     #[error(transparent)]

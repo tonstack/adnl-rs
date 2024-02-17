@@ -42,8 +42,8 @@ impl AdnlBuilder {
     /// Perform key agreement using sender private key and receiver public
     pub fn perform_ecdh<S, P>(
         self,
-        sender_private: S,
-        receiver_public: P,
+        sender_private: &S,
+        receiver_public: &P,
     ) -> AdnlHandshake<<S as AdnlPrivateKey>::PublicKey>
     where
         S: AdnlPrivateKey,

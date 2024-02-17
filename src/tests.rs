@@ -51,11 +51,11 @@ fn test_handshake(
     // test serializing
     let aes_params_raw: [u8; 160] = aes_params.try_into().unwrap();
     let aes_params = AdnlAesParams::from(aes_params_raw);
-    let remote_public: [u8; 32] = remote_public.try_into().unwrap();
-    let local_public: [u8; 32] = local_public.try_into().unwrap();
+    let remote_public = AdnlRawPublicKey::try_from(&*remote_public).unwrap();
+    let local_public = AdnlRawPublicKey::try_from(&*local_public).unwrap();
     let ecdh_raw: [u8; 32] = ecdh.try_into().unwrap();
     let ecdh = AdnlSecret::from(ecdh_raw);
-    let handshake = AdnlHandshake::new(remote_public.address(), local_public, ecdh, aes_params);
+    let handshake = AdnlHandshake::new(remote_public.address(), local_public.clone(), ecdh.clone(), aes_params);
     assert_eq!(
         handshake.to_bytes(),
         expected_handshake.as_slice(),
@@ -64,27 +64,27 @@ fn test_handshake(
 
     // test deserializing
     struct DummyKey {
-        ecdh: [u8; 32],
-        public: [u8; 32]
+        ecdh: AdnlSecret,
+        public: AdnlRawPublicKey
     }
 
     impl AdnlPrivateKey for DummyKey {
-        type PublicKey = [u8; 32];
+        type PublicKey = AdnlRawPublicKey;
 
-        fn key_agreement<P: AdnlPublicKey>(&self, _their_public: P) -> AdnlSecret {
-            AdnlSecret::from(self.ecdh)
+        fn key_agreement<P: AdnlPublicKey>(&self, _their_public: &P) -> AdnlSecret {
+            self.ecdh.clone()
         }
 
         fn public(&self) -> Self::PublicKey {
-            self.public
+            self.public.clone()
         }
     }
 
-    let key = DummyKey { ecdh: ecdh_raw, public: remote_public };
-    let handshake2 = AdnlHandshake::decrypt_from_raw(&expected_handshake, &key).expect("valid handshake");
+    let key = DummyKey { ecdh: ecdh, public: remote_public.clone() };
+    let handshake2 = AdnlHandshake::decrypt_from_raw(expected_handshake.as_slice().try_into().unwrap(), &key).expect("invalid handshake");
     assert_eq!(handshake2.aes_params().to_bytes(), aes_params_raw, "aes_params mismatch");
     assert_eq!(handshake2.receiver(), &remote_public.address(), "receiver mismatch");
-    assert_eq!(handshake2.sender(), &local_public, "sender mismatch");
+    assert_eq!(handshake2.sender().to_bytes(), local_public.to_bytes(), "sender mismatch");
     assert_eq!(&handshake2.to_bytes(), expected_handshake.as_slice(), "reencryption failed");
 }
 

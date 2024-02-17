@@ -22,6 +22,8 @@ impl AdnlReceiver {
     /// will be sent to `consumer`, which usually can be just `Vec`. Note that
     /// data can be processed before this function will return, but in case of
     /// [`AdnlError::IntegrityError`] you must assume that the data was tampered.
+    /// 
+    /// Returns received packet length.
     ///
     /// You can adjust `BUFFER` according to your memory requirements.
     /// Recommended size is 8192 bytes.
@@ -29,7 +31,7 @@ impl AdnlReceiver {
         &mut self,
         transport: &mut R,
         consumer: &mut C,
-    ) -> Result<(), AdnlError> {
+    ) -> Result<usize, AdnlError> {
         // read length
         let mut length = [0u8; 4];
         log::debug!("reading length");
@@ -111,6 +113,6 @@ impl AdnlReceiver {
 
         log::debug!("receive finished successfully");
 
-        Ok(())
+        Ok(length as usize)
     }
 }

@@ -16,7 +16,7 @@ impl AdnlPublicKey for PublicKey {
     }
 }
 
-fn edwards_to_montgomery<P: AdnlPublicKey>(public_key: P) -> PublicKey {
+fn edwards_to_montgomery<P: AdnlPublicKey>(public_key: &P) -> PublicKey {
     PublicKey::from(
         CompressedEdwardsY::from_slice(&public_key.to_bytes())
             .decompress()
@@ -29,7 +29,7 @@ fn edwards_to_montgomery<P: AdnlPublicKey>(public_key: P) -> PublicKey {
 impl AdnlPrivateKey for StaticSecret {
     type PublicKey = PublicKey;
 
-    fn key_agreement<P: AdnlPublicKey>(&self, their_public: P) -> AdnlSecret {
+    fn key_agreement<P: AdnlPublicKey>(&self, their_public: &P) -> AdnlSecret {
         AdnlSecret::from(
             self.diffie_hellman(&edwards_to_montgomery(their_public))
                 .to_bytes(),

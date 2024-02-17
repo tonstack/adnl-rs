@@ -1,5 +1,6 @@
+use crate::helper_types::AdnlRawPublicKey;
 use crate::primitives::AdnlAes;
-use crate::{AdnlAddress, AdnlAesParams, AdnlClient, AdnlError, AdnlPrivateKey, AdnlPublicKey, AdnlSecret};
+use crate::{AdnlAddress, AdnlAesParams, AdnlPeer, AdnlError, AdnlPrivateKey, AdnlPublicKey, AdnlSecret};
 use aes::cipher::KeyIvInit;
 use ctr::cipher::StreamCipher;
 use sha2::{Digest, Sha256};
@@ -64,8 +65,8 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
     pub async fn perform_handshake<T: AsyncReadExt + AsyncWriteExt + Unpin>(
         &self,
         transport: T,
-    ) -> Result<AdnlClient<T>, AdnlError> {
-        AdnlClient::perform_handshake(transport, self).await
+    ) -> Result<AdnlPeer<T>, AdnlError> {
+        AdnlPeer::perform_handshake(transport, self).await
     }
 
     fn initialize_aes(secret: &AdnlSecret, hash: &[u8]) -> AdnlAes {
@@ -87,11 +88,10 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
     }
 }
 
-impl AdnlHandshake<[u8; 32]> {
+impl AdnlHandshake<AdnlRawPublicKey> {
     /// Deserialize and decrypt handshake
-    pub fn decrypt_from_raw<S: AdnlPrivateKey>(packet: &[u8], key: &S) -> Result<Self, AdnlError> {
-        let receiver: [u8; 32] = packet[..32].try_into().unwrap();
-        let receiver = AdnlAddress::from(receiver);
+    pub fn decrypt_from_raw<S: AdnlPrivateKey>(packet: &[u8; 256], key: &S) -> Result<Self, AdnlError> {
+        let receiver = packet[..32].try_into().unwrap();
         let sender = packet[32..64].try_into().unwrap();
         let hash: [u8; 32] = packet[64..96].try_into().unwrap();
         let mut raw_params: [u8; 160] = packet[96..256].try_into().unwrap();
@@ -100,7 +100,7 @@ impl AdnlHandshake<[u8; 32]> {
             return Err(AdnlError::UnknownAddr(receiver))
         }
 
-        let secret = key.key_agreement(sender);
+        let secret = key.key_agreement(&sender);
         let mut aes = Self::initialize_aes(&secret, &hash);
         aes.apply_keystream(&mut raw_params);
 

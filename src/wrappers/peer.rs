@@ -1,22 +1,22 @@
-use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPublicKey, AdnlReceiver, AdnlSender};
+use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPrivateKey, AdnlPublicKey, AdnlReceiver, AdnlSender};
 use tokio::io::{empty, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use x25519_dalek::StaticSecret;
 
 /// Abstraction over [`AdnlSender`] and [`AdnlReceiver`] to keep things simple
-pub struct AdnlClient<T: AsyncReadExt + AsyncWriteExt> {
+pub struct AdnlPeer<T: AsyncReadExt + AsyncWriteExt> {
     sender: AdnlSender,
     receiver: AdnlReceiver,
     transport: T,
 }
 
-impl AdnlClient<TcpStream> {
-    /// Create ADNL client use random private key and random AES params
+impl AdnlPeer<TcpStream> {
+    /// Create ADNL client using random private key and random AES params
     #[cfg(feature = "dalek")]
     pub async fn connect<P: AdnlPublicKey, A: ToSocketAddrs>(
-        ls_public: P,
+        ls_public: &P,
         ls_addr: A,
-    ) -> Result<AdnlClient<TcpStream>, AdnlError> {
+    ) -> Result<AdnlPeer<TcpStream>, AdnlError> {
         // generate private key
         let local_secret = StaticSecret::new(rand::rngs::OsRng);
 
@@ -26,15 +26,16 @@ impl AdnlClient<TcpStream> {
         // build handshake using random session keys, encrypt it with ECDH(local_secret, remote_public)
         // then perform handshake over our TcpStream
         let client = AdnlBuilder::with_random_aes_params(&mut rand::rngs::OsRng)
-            .perform_ecdh(local_secret, ls_public)
+            .perform_ecdh(&local_secret, ls_public)
             .perform_handshake(transport)
             .await?;
         Ok(client)
     }
 }
 
-impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
-    /// Send `handshake` over `transport` and check that handshake was successful
+impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlPeer<T> {
+    /// Act as a client: send `handshake` over `transport` and check that handshake was successful
+    /// Returns client part of ADNL connection
     pub async fn perform_handshake<P: AdnlPublicKey>(
         mut transport: T,
         handshake: &AdnlHandshake<P>,
@@ -53,10 +54,31 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
         };
         let mut empty = empty();
         client
-            .receiver
-            .receive::<_, _, 0>(&mut client.transport, &mut empty)
+            .receive_with_buffer::<_, 0>(&mut empty)
             .await?;
         Ok(client)
+    }
+
+    /// Act as a server: receive handshake over transport. 
+    /// Verifies following things:
+    /// 1) target ADNL address matches associated with provided private key
+    /// 2) integrity of handshake is not compromised
+    pub async fn handle_handshake<S: AdnlPrivateKey>(mut transport: T, private_key: &S) -> Result<Self, AdnlError> {
+        // receive handshake
+        let mut packet = [0u8; 256];
+        transport.read_exact(&mut packet).await.map_err(AdnlError::ReadError)?;
+        let handshake = AdnlHandshake::decrypt_from_raw(&packet, private_key)?;
+
+        let mut server = Self {
+            sender: AdnlSender::new(handshake.aes_params()),
+            receiver: AdnlReceiver::new(handshake.aes_params()),
+            transport,
+        };
+
+        // send empty packet to proof knowledge of AES keys
+        server.send(&mut []).await?;
+
+        Ok(server)
     }
 
     /// Send `data` to another peer with random nonce
@@ -80,7 +102,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
     pub async fn receive<C: AsyncWriteExt + Unpin>(
         &mut self,
         consumer: &mut C,
-    ) -> Result<(), AdnlError> {
+    ) -> Result<usize, AdnlError> {
         self.receiver
             .receive::<_, _, 8192>(&mut self.transport, consumer)
             .await
@@ -91,7 +113,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlClient<T> {
     pub async fn receive_with_buffer<C: AsyncWriteExt + Unpin, const BUFFER: usize>(
         &mut self,
         consumer: &mut C,
-    ) -> Result<(), AdnlError> {
+    ) -> Result<usize, AdnlError> {
         self.receiver
             .receive::<_, _, BUFFER>(&mut self.transport, consumer)
             .await
