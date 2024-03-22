@@ -106,17 +106,6 @@ impl From<[u8; 160]> for AdnlAesParams {
 }
 
 impl AdnlAesParams {
-    /// Swap receiver and transciever keys
-    pub fn swap(self) -> Self {
-        Self {
-            rx_key: self.tx_key,
-            tx_key: self.rx_key,
-            rx_nonce: self.tx_nonce,
-            tx_nonce: self.rx_nonce,
-            padding: self.padding,
-        }
-    }
-
     pub fn rx_key(&self) -> &[u8; 32] {
         &self.rx_key
     }

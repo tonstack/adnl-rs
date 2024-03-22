@@ -112,7 +112,7 @@ fn test_send_2() {
 
 fn test_send(aes_params: Vec<u8>, buffer: Vec<u8>, expected_packet: Vec<u8>) {
     let aes_params: [u8; 160] = aes_params.try_into().unwrap();
-    let mut codec = AdnlCodec::new(&aes_params.into());
+    let mut codec = AdnlCodec::client(&aes_params.into());
     let mut packet = BytesMut::new();
     codec.encode(buffer.clone().into(), &mut packet).expect("packet must be encoded correctly");
 
@@ -128,7 +128,7 @@ fn test_send(aes_params: Vec<u8>, buffer: Vec<u8>, expected_packet: Vec<u8>) {
     new_aes_params[64..80].copy_from_slice(&aes_params[80..96]);
     new_aes_params[80..96].copy_from_slice(&aes_params[64..80]);
     new_aes_params[96..160].copy_from_slice(&aes_params[96..160]);
-    let mut codec = AdnlCodec::new(&new_aes_params.into());
+    let mut codec = AdnlCodec::client(&new_aes_params.into());
     test_recv(&mut codec, packet.into(), buffer);
 }
 
@@ -138,7 +138,7 @@ fn test_recv_1() {
     let expected_data = Vec::new();
     let aes_params = hex::decode("b3d529e34b839a521518447b68343aebaae9314ac95aaacfdb687a2163d1a98638db306b63409ef7bc906b4c9dc115488cf90dfa964f520542c69e1a4a495edf9ae9ee72023203c8b266d552f251e8d724929733428c8e276ab3bd6291367336a6ab8dc3d36243419bd0b742f76691a5dec14edbd50f7c1b58ec961ae45be58cbf6623f3ec9705bd5d227761ec79cee377e2566ff668f863552bddfd6ff3a16b").unwrap();
     let aes_params: [u8; 160] = aes_params.as_slice().try_into().unwrap();
-    let mut codec = AdnlCodec::new(&aes_params.into());
+    let mut codec = AdnlCodec::client(&aes_params.into());
     test_recv(&mut codec, encrypted_data, expected_data);
     let encrypted_data = hex::decode("4b72a32bf31894cce9ceffd2dd97176e502946524e45e62689bd8c5d31ad53603c5fd3b402771f707cd2747747fad9df52e6c23ceec9fa2ee5b0f68b61c33c7790db03d1c593798a29d716505cea75acdf0e031c25447c55c4d29d32caab29bd5a0787644843bafc04160c92140aab0ecc990927").unwrap();
     let expected_data = hex::decode("1684ac0f71ff48e9b263959b17a04faae4a23501380d2aa932b09eac6f9846fcbae9bbcb080d0053e9a3ac3062000000").unwrap();
@@ -151,7 +151,7 @@ fn test_recv_2() {
     let expected_data = Vec::new();
     let aes_params = hex::decode("7e3c66de7c64d4bee4368e69560101991db4b084430a336cffe676c9ac0a795d8c98367309422a8e927e62ed657ba3eaeeb6acd3bbe5564057dfd1d60609a25a48963cbb7d14acf4fc83ec59254673bc85be22d04e80e7b83c641d37cae6e1d82a400bf159490bbc0048e69234ad89e999d792eefdaa56734202546d9188706e95e1272267206a8e7ee1f7c077f76bd26e494972e34d72e257bf20364dbf39b0").unwrap();
     let aes_params: [u8; 160] = aes_params.as_slice().try_into().unwrap();
-    let mut codec = AdnlCodec::new(&aes_params.into());
+    let mut codec = AdnlCodec::client(&aes_params.into());
     test_recv(&mut codec, encrypted_data, expected_data);
     let encrypted_data = hex::decode("77ebea5a6e6c8758e7703d889abad16e7e3c4e0c10c4e81ca10d0d9abddabb6f008905133a070ff825ad3f4b0ae969e04dbd8b280864d3d2175f3bc7cf3deb31de5497fa43997d8e2acafb9a31de2a22ecb279b5854c00791216e39c2e65863539d82716fc020e9647b2dd99d0f14e4f553b645f").unwrap();
     let expected_data = hex::decode("1684ac0f7bcae111ea0e56457826b1aec7f0f59b9b6579678b3db3839d17b63eb60174f2080d0053e90bb03062000000").unwrap();

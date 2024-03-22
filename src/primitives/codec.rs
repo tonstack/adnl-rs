@@ -13,10 +13,18 @@ pub struct AdnlCodec {
 }
 
 impl AdnlCodec {
-    pub fn new(aes_params: &AdnlAesParams) -> Self {
+    pub fn client(aes_params: &AdnlAesParams) -> Self {
         Self {
             aes_rx: AdnlAes::new(aes_params.rx_key().into(), aes_params.rx_nonce().into()),
             aes_tx: AdnlAes::new(aes_params.tx_key().into(), aes_params.tx_nonce().into()),
+            last_readed_length: None,
+        }
+    }
+
+    pub fn server(aes_params: &AdnlAesParams) -> Self {
+        Self {
+            aes_rx: AdnlAes::new(aes_params.tx_key().into(), aes_params.tx_nonce().into()),
+            aes_tx: AdnlAes::new(aes_params.rx_key().into(), aes_params.rx_nonce().into()),
             last_readed_length: None,
         }
     }

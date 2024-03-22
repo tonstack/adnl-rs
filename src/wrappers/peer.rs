@@ -52,7 +52,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlPeer<T> {
             .await
             .map_err(AdnlError::IoError)?;
 
-        let mut stream = handshake.make_codec().framed(transport);
+        let mut stream = handshake.make_client_codec().framed(transport);
 
         // receive empty message to ensure that server knows our AES keys
         if let Some(x) = stream.next().await {
@@ -74,7 +74,7 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlPeer<T> {
         let handshake = AdnlHandshake::decrypt_from_raw(&packet, private_key)?;
 
         let mut server = Self {
-            stream: handshake.make_codec().framed(transport),
+            stream: handshake.make_server_codec().framed(transport),
         };
 
         // send empty packet to proof knowledge of AES keys

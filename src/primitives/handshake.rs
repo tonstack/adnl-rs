@@ -63,8 +63,12 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
         packet
     }
 
-    pub fn make_codec(&self) -> AdnlCodec {
-        AdnlCodec::new(&self.aes_params)
+    pub fn make_client_codec(&self) -> AdnlCodec {
+        AdnlCodec::client(&self.aes_params)
+    }
+
+    pub fn make_server_codec(&self) -> AdnlCodec {
+        AdnlCodec::server(&self.aes_params)
     }
 
     /// Send handshake over the given transport, build [`AdnlClient`] on top of it
@@ -117,7 +121,7 @@ impl AdnlHandshake<AdnlRawPublicKey> {
         Ok(Self {
             receiver,
             sender,
-            aes_params: AdnlAesParams::from(raw_params).swap(),
+            aes_params: AdnlAesParams::from(raw_params),
             secret,
         })
     }
