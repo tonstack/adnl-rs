@@ -6,6 +6,8 @@ use ctr::cipher::StreamCipher;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+use super::codec::AdnlCodec;
+
 /// Handshake packet, must be sent from client to server prior to any datagrams
 pub struct AdnlHandshake<P: AdnlPublicKey> {
     receiver: AdnlAddress,
@@ -55,10 +57,14 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
 
         let mut packet = [0u8; 256];
         packet[..32].copy_from_slice(self.receiver.as_bytes());
-        packet[32..64].copy_from_slice(&self.sender.to_bytes());
+        packet[32..64].copy_from_slice(&self.sender.edwards_repr());
         packet[64..96].copy_from_slice(&hash);
         packet[96..256].copy_from_slice(&raw_params);
         packet
+    }
+
+    pub fn make_codec(&self) -> AdnlCodec {
+        AdnlCodec::new(&self.aes_params)
     }
 
     /// Send handshake over the given transport, build [`AdnlClient`] on top of it
@@ -111,7 +117,7 @@ impl AdnlHandshake<AdnlRawPublicKey> {
         Ok(Self {
             receiver,
             sender,
-            aes_params: AdnlAesParams::from(raw_params),
+            aes_params: AdnlAesParams::from(raw_params).swap(),
             secret,
         })
     }

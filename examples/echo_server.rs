@@ -3,6 +3,7 @@
 use std::{env, error::Error};
 
 use adnl::{AdnlPeer, AdnlPrivateKey, AdnlPublicKey};
+use futures::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
 use x25519_dalek::StaticSecret;
 
@@ -16,7 +17,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
     // ADNL: get private key from environment variable KEY or use default insecure one
-    let private_key_hex = env::var("KEY").unwrap_or_else(|_| "69734189c0348245a70eb5335e12bfd75dd4cffc42baf32773e8f994ff5cf7c2".to_string());
+    let private_key_hex = env::var("KEY").unwrap_or_else(|_| "f0971651aec4bb0d65ec3861c597687fda9c1e7d2ee8a93acb9a131aa9f3aee7".to_string());
     let private_key_bytes: [u8; 32] = hex::decode(private_key_hex)?.try_into().unwrap();
     let private_key = StaticSecret::from(private_key_bytes);
 
@@ -27,7 +28,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Listening on: {}", addr);
 
     // ADNL: print public key and adnl address associated with given private key
-    println!("Public key is: {}", hex::encode(private_key.public().as_bytes()));
+    println!("Public key is: {}", hex::encode(private_key.public().edwards_repr()));
     println!("Address is: {}", hex::encode(private_key.public().address().as_bytes()));
 
     loop {
@@ -47,18 +48,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // ADNL: handle handshake
             let mut adnl_server = AdnlPeer::handle_handshake(socket, &private_key).await.expect("handshake failed");
 
-            let mut buf = vec![0; 1024];
-
             // In a loop, read data from the socket and write the data back.
-            loop {
-                let n = adnl_server.receive(&mut buf)
-                    .await
-                    .expect("failed to read data from socket");
-
-                adnl_server
-                    .send(&mut buf[..n])
-                    .await
-                    .expect("failed to write data to socket");
+            while let Some(Ok(packet)) = adnl_server.next().await {
+                let _ = adnl_server.send(packet).await;
             }
         });
     }

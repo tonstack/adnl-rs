@@ -1,4 +1,5 @@
 use adnl::{AdnlPeer, AdnlRawPublicKey};
+use futures::{SinkExt, StreamExt};
 use std::{error::Error, net::SocketAddrV4};
 
 #[tokio::main]
@@ -9,18 +10,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let ls_ip = "65.21.74.140";
     let ls_port = 46427;
     // act as a client: connect to ADNL server and perform handshake
-    let mut client =
-        AdnlPeer::connect(&remote_public, SocketAddrV4::new(ls_ip.parse()?, ls_port)).await?;
+    let mut client = AdnlPeer::connect(&remote_public, SocketAddrV4::new(ls_ip.parse()?, ls_port)).await?;
 
     // already serialized TL with gettime query
-    let mut query = hex::decode("7af98bb435263e6c95d6fecb497dfd0aa5f031e7d412986b5ce720496db512052e8f2d100cdf068c7904345aad16000000000000")?;
+    let query = hex::decode("7af98bb435263e6c95d6fecb497dfd0aa5f031e7d412986b5ce720496db512052e8f2d100cdf068c7904345aad16000000000000")?;
 
-    // send over ADNL, use random nonce
-    client.send(&mut query).await?;
+    // send over ADNL
+    client.send(query.into()).await?;
 
-    // receive result into vector, use 8192 bytes buffer
-    let mut result = Vec::<u8>::new();
-    client.receive(&mut result).await?;
+    // receive result
+    let result = client.next().await.ok_or_else(|| "no result")??;
 
     // get time from serialized TL answer
     println!(

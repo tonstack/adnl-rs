@@ -7,22 +7,24 @@ pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
 impl<T> CryptoRandom for T where T: rand_core::RngCore + rand_core::CryptoRng {}
 
 pub trait AdnlPublicKey {
+    /// Derives address from a public key
     fn address(&self) -> AdnlAddress {
         let mut hasher = Sha256::new();
         hasher.update([0xc6, 0xb4, 0x13, 0x48]); // type id - always ed25519
-        hasher.update(self.to_bytes());
+        hasher.update(self.edwards_repr());
         AdnlAddress(hasher.finalize().into())
     }
 
-    fn to_bytes(&self) -> [u8; 32];
+    /// Gets ed25519 representation of a public key
+    fn edwards_repr(&self) -> [u8; 32];
 }
 
-/// Public key can be provided using raw slice
+/// Public key can be provided in a ed25519 form using raw slice
 #[derive(Clone)]
 pub struct AdnlRawPublicKey([u8; 32]);
 
 impl AdnlPublicKey for AdnlRawPublicKey {
-    fn to_bytes(&self) -> [u8; 32] {
+    fn edwards_repr(&self) -> [u8; 32] {
         self.0
     }
 }
@@ -104,6 +106,17 @@ impl From<[u8; 160]> for AdnlAesParams {
 }
 
 impl AdnlAesParams {
+    /// Swap receiver and transciever keys
+    pub fn swap(self) -> Self {
+        Self {
+            rx_key: self.tx_key,
+            tx_key: self.rx_key,
+            rx_nonce: self.tx_nonce,
+            tx_nonce: self.rx_nonce,
+            padding: self.padding,
+        }
+    }
+
     pub fn rx_key(&self) -> &[u8; 32] {
         &self.rx_key
     }
@@ -188,18 +201,16 @@ impl AdnlSecret {
 /// Common error type
 #[derive(Debug, Error)]
 pub enum AdnlError {
-    #[error("Read error")]
-    ReadError(Error),
-    #[error("Write error")]
-    WriteError(Error),
-    #[error("Consume error")]
-    ConsumeError(Error),
+    #[error("IO error")]
+    IoError(#[from] Error),
     #[error("Integrity error")]
     IntegrityError,
-    #[error("TooShortPacket error")]
+    #[error("Too short packet (32 bytes min)")]
     TooShortPacket,
+    #[error("Too long packet (4 MiB max)")]
+    TooLongPacket,
     #[error("Receiver ADNL address mismatch")]
     UnknownAddr(AdnlAddress),
-    #[error(transparent)]
-    OtherError(#[from] Error),
+    #[error("End of stream")]
+    EndOfStream,
 }

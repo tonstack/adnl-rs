@@ -1,13 +1,22 @@
-use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPrivateKey, AdnlPublicKey, AdnlReceiver, AdnlSender};
-use tokio::io::{empty, AsyncReadExt, AsyncWriteExt};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
+use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPrivateKey, AdnlPublicKey};
+use pin_project::pin_project;
+use tokio::io::{empty, AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio_util::bytes::Bytes;
+use tokio_util::codec::{Decoder, Encoder, Framed};
 use x25519_dalek::StaticSecret;
+use futures::{Sink, SinkExt, Stream, StreamExt};
+
+use crate::primitives::codec::AdnlCodec;
 
 /// Abstraction over [`AdnlSender`] and [`AdnlReceiver`] to keep things simple
-pub struct AdnlPeer<T: AsyncReadExt + AsyncWriteExt> {
-    sender: AdnlSender,
-    receiver: AdnlReceiver,
-    transport: T,
+#[pin_project]
+pub struct AdnlPeer<T> where T: AsyncRead + AsyncWrite {
+    #[pin]
+    stream: Framed<T, AdnlCodec>,
 }
 
 impl AdnlPeer<TcpStream> {
@@ -36,27 +45,22 @@ impl AdnlPeer<TcpStream> {
 impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlPeer<T> {
     /// Act as a client: send `handshake` over `transport` and check that handshake was successful
     /// Returns client part of ADNL connection
-    pub async fn perform_handshake<P: AdnlPublicKey>(
-        mut transport: T,
-        handshake: &AdnlHandshake<P>,
-    ) -> Result<Self, AdnlError> {
+    pub async fn perform_handshake<P: AdnlPublicKey>(mut transport: T, handshake: &AdnlHandshake<P>) -> Result<Self, AdnlError> {
         // send handshake
         transport
             .write_all(&handshake.to_bytes())
             .await
-            .map_err(AdnlError::WriteError)?;
+            .map_err(AdnlError::IoError)?;
+
+        let mut stream = handshake.make_codec().framed(transport);
 
         // receive empty message to ensure that server knows our AES keys
-        let mut client = Self {
-            sender: AdnlSender::new(handshake.aes_params()),
-            receiver: AdnlReceiver::new(handshake.aes_params()),
-            transport,
-        };
-        let mut empty = empty();
-        client
-            .receive_with_buffer::<_, 0>(&mut empty)
-            .await?;
-        Ok(client)
+        if let Some(x) = stream.next().await {
+            x?;
+            Ok(Self { stream })
+        } else {
+            Err(AdnlError::EndOfStream)
+        }
     }
 
     /// Act as a server: receive handshake over transport. 
@@ -66,56 +70,46 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlPeer<T> {
     pub async fn handle_handshake<S: AdnlPrivateKey>(mut transport: T, private_key: &S) -> Result<Self, AdnlError> {
         // receive handshake
         let mut packet = [0u8; 256];
-        transport.read_exact(&mut packet).await.map_err(AdnlError::ReadError)?;
+        transport.read_exact(&mut packet).await.map_err(AdnlError::IoError)?;
         let handshake = AdnlHandshake::decrypt_from_raw(&packet, private_key)?;
 
         let mut server = Self {
-            sender: AdnlSender::new(handshake.aes_params()),
-            receiver: AdnlReceiver::new(handshake.aes_params()),
-            transport,
+            stream: handshake.make_codec().framed(transport),
         };
 
         // send empty packet to proof knowledge of AES keys
-        server.send(&mut []).await?;
+        server.send(Bytes::new()).await?;
 
         Ok(server)
     }
+}
 
-    /// Send `data` to another peer with random nonce
-    pub async fn send(&mut self, data: &mut [u8]) -> Result<(), AdnlError> {
-        self.sender
-            .send(&mut self.transport, &mut rand::random(), data)
-            .await
+impl<T> Stream for AdnlPeer<T> where T: AsyncRead + AsyncWrite
+{
+    type Item = Result<Bytes, AdnlError>;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.project().stream.poll_next(cx)
+    }
+}
+
+impl<T> Sink<Bytes> for AdnlPeer<T> where T: AsyncWrite + AsyncRead
+{
+    type Error = AdnlError;
+
+    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().stream.poll_ready(cx)
     }
 
-    /// Send `data` to another peer. Random `nonce` must be provided to eliminate bit-flipping attacks.
-    pub async fn send_with_nonce(
-        &mut self,
-        data: &mut [u8],
-        nonce: &mut [u8; 32],
-    ) -> Result<(), AdnlError> {
-        self.sender.send(&mut self.transport, nonce, data).await
+    fn start_send(self: Pin<&mut Self>, item: Bytes) -> Result<(), Self::Error> {
+        self.project().stream.start_send(item)
     }
 
-    /// Receive data from another peer into `consumer` which will process the data with
-    /// a `BUFFER` size of 8192 bytes.
-    pub async fn receive<C: AsyncWriteExt + Unpin>(
-        &mut self,
-        consumer: &mut C,
-    ) -> Result<usize, AdnlError> {
-        self.receiver
-            .receive::<_, _, 8192>(&mut self.transport, consumer)
-            .await
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().stream.poll_flush(cx)
     }
 
-    /// Receive data from another peer into `consumer` which will process the data. Set `BUFFER`
-    /// according to your memory requirements, recommended size is 8192 bytes.
-    pub async fn receive_with_buffer<C: AsyncWriteExt + Unpin, const BUFFER: usize>(
-        &mut self,
-        consumer: &mut C,
-    ) -> Result<usize, AdnlError> {
-        self.receiver
-            .receive::<_, _, BUFFER>(&mut self.transport, consumer)
-            .await
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.project().stream.poll_close(cx)
     }
 }

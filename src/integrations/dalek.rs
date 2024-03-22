@@ -7,7 +7,7 @@ use curve25519_dalek::montgomery::MontgomeryPoint;
 use x25519_dalek::{PublicKey, StaticSecret};
 
 impl AdnlPublicKey for PublicKey {
-    fn to_bytes(&self) -> [u8; 32] {
+    fn edwards_repr(&self) -> [u8; 32] {
         MontgomeryPoint(self.to_bytes())
             .to_edwards(0)
             .unwrap()
@@ -18,7 +18,7 @@ impl AdnlPublicKey for PublicKey {
 
 fn edwards_to_montgomery<P: AdnlPublicKey>(public_key: &P) -> PublicKey {
     PublicKey::from(
-        CompressedEdwardsY::from_slice(&public_key.to_bytes())
+        CompressedEdwardsY::from_slice(&public_key.edwards_repr())
             .decompress()
             .unwrap()
             .to_montgomery()
