@@ -3,10 +3,10 @@ use std::task::{Context, Poll};
 
 use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPrivateKey, AdnlPublicKey};
 use pin_project::pin_project;
-use tokio::io::{empty, AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::bytes::Bytes;
-use tokio_util::codec::{Decoder, Encoder, Framed};
+use tokio_util::codec::{Decoder, Framed};
 use x25519_dalek::StaticSecret;
 use futures::{Sink, SinkExt, Stream, StreamExt};
 
@@ -27,7 +27,7 @@ impl AdnlPeer<TcpStream> {
         ls_addr: A,
     ) -> Result<AdnlPeer<TcpStream>, AdnlError> {
         // generate private key
-        let local_secret = StaticSecret::new(rand::rngs::OsRng);
+        let local_secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
 
         // use TcpStream as transport for our ADNL connection
         let transport = TcpStream::connect(ls_addr).await?;

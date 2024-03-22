@@ -15,8 +15,8 @@ ctr = "0.9.1"
 aes = "0.8.1"
 log = "0.4.14"
 rand_core = "0.6.3"
-x25519-dalek = { version = "2.0.0-pre.1", optional = true }
-curve25519-dalek = { version = "4.0.0-pre.2", optional = true }
+x25519-dalek = { version = "2.0.1", features = ["static_secrets"], optional = true }
+curve25519-dalek = { version = "4.1.2", optional = true }
 tokio = { version = "1.36", features = ["net", "io-util"] }
 tokio-util = { version = "0.7.10", features = ["codec"] }
 thiserror = "1"

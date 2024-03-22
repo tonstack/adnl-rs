@@ -1,7 +1,5 @@
 extern crate alloc;
 
-use std::error::Error;
-
 use super::*;
 use alloc::vec::Vec;
 use futures::{SinkExt, StreamExt};
@@ -176,7 +174,7 @@ fn test_public_key_consistency() {
 
 #[tokio::test]
 async fn integrity_test() {
-    let server_private = StaticSecret::new(rand::thread_rng());
+    let server_private = StaticSecret::random_from_rng(rand::thread_rng());
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
     let server_public = server_private.public();
@@ -201,4 +199,6 @@ async fn integrity_test() {
 
     // receive result
     let result = client.next().await.expect("packet must be received").expect("packet must be decoded properly");
+
+    assert_eq!(result, "hello".as_bytes());
 }

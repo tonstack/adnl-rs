@@ -19,6 +19,7 @@ impl AdnlPublicKey for PublicKey {
 fn edwards_to_montgomery<P: AdnlPublicKey>(public_key: &P) -> PublicKey {
     PublicKey::from(
         CompressedEdwardsY::from_slice(&public_key.edwards_repr())
+            .unwrap()
             .decompress()
             .unwrap()
             .to_montgomery()
