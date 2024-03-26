@@ -1,5 +1,5 @@
 pub use helper_types::{
-    AdnlAddress, AdnlAesParams, AdnlError, AdnlPrivateKey, AdnlPublicKey, AdnlSecret, AdnlRawPublicKey,
+    AdnlAddress, AdnlAesParams, AdnlError, AdnlPrivateKey, AdnlPublicKey, AdnlSecret, AdnlRawPublicKey, AdnlConnectionInfo
 };
 pub use primitives::handshake::AdnlHandshake;
 pub use primitives::codec::AdnlCodec;

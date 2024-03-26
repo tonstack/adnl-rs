@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let private_key = private_key.clone();
         tokio::spawn(async move {
             // ADNL: handle handshake
-            let mut adnl_server = AdnlPeer::handle_handshake(socket, &private_key).await.expect("handshake failed");
+            let mut adnl_server = AdnlPeer::handle_handshake(socket, |_| Some(private_key.clone())).await.expect("handshake failed");
 
             // In a loop, read data from the socket and write the data back.
             while let Some(Ok(packet)) = adnl_server.next().await {

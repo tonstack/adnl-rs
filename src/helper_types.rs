@@ -203,3 +203,23 @@ pub enum AdnlError {
     #[error("End of stream")]
     EndOfStream,
 }
+
+/// Information about connected peers.
+pub struct AdnlConnectionInfo {
+    local_address: AdnlAddress,
+    remote_address: AdnlAddress,
+}
+
+impl AdnlConnectionInfo {
+    pub fn new(local_address: AdnlAddress, remote_address: AdnlAddress) -> Self {
+        Self { local_address, remote_address }
+    }
+
+    pub fn local_address(&self) -> &AdnlAddress {
+        &self.local_address
+    }
+
+    pub fn remote_address(&self) -> &AdnlAddress {
+        &self.remote_address
+    }
+}

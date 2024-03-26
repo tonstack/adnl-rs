@@ -1,7 +1,9 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::{AdnlBuilder, AdnlError, AdnlHandshake, AdnlPrivateKey, AdnlPublicKey};
+use crate::helper_types::AdnlConnectionInfo;
+use crate::primitives::handshake;
+use crate::{AdnlAddress, AdnlBuilder, AdnlError, AdnlHandshake, AdnlPrivateKey, AdnlPublicKey};
 use pin_project::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
@@ -17,6 +19,7 @@ use crate::primitives::codec::AdnlCodec;
 pub struct AdnlPeer<T> where T: AsyncRead + AsyncWrite {
     #[pin]
     stream: Framed<T, AdnlCodec>,
+    connection_info: AdnlConnectionInfo,
 }
 
 impl AdnlPeer<TcpStream> {
@@ -57,24 +60,24 @@ impl<T: AsyncReadExt + AsyncWriteExt + Unpin> AdnlPeer<T> {
         // receive empty message to ensure that server knows our AES keys
         if let Some(x) = stream.next().await {
             x?;
-            Ok(Self { stream })
+            let connection_info = AdnlConnectionInfo::new(handshake.sender().address(), handshake.receiver().clone());
+            Ok(Self { stream, connection_info })
         } else {
             Err(AdnlError::EndOfStream)
         }
     }
 
-    /// Act as a server: receive handshake over transport. 
-    /// Verifies following things:
-    /// 1) target ADNL address matches associated with provided private key
-    /// 2) integrity of handshake is not compromised
-    pub async fn handle_handshake<S: AdnlPrivateKey>(mut transport: T, private_key: &S) -> Result<Self, AdnlError> {
+    /// Act as a server: receive handshake over transport using private key provided by `private_key_selector`.
+    pub async fn handle_handshake<S: AdnlPrivateKey, F: Fn(&AdnlAddress) -> Option<S>>(mut transport: T, private_key_selector: F) -> Result<Self, AdnlError> {
         // receive handshake
         let mut packet = [0u8; 256];
         transport.read_exact(&mut packet).await.map_err(AdnlError::IoError)?;
-        let handshake = AdnlHandshake::decrypt_from_raw(&packet, private_key)?;
+        let handshake = AdnlHandshake::decrypt_from_raw(&packet, private_key_selector)?;
+        let connection_info = AdnlConnectionInfo::new(handshake.receiver().clone(), handshake.sender().address());
 
         let mut server = Self {
             stream: handshake.make_server_codec().framed(transport),
+            connection_info,
         };
 
         // send empty packet to proof knowledge of AES keys

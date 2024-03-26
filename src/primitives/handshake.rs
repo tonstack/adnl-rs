@@ -99,14 +99,17 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
 }
 
 impl AdnlHandshake<AdnlRawPublicKey> {
-    /// Deserialize and decrypt handshake
-    pub fn decrypt_from_raw<S: AdnlPrivateKey>(packet: &[u8; 256], key: &S) -> Result<Self, AdnlError> {
+    /// Deserialize and decrypt handshake using private key from `private_key_selector` function
+    pub fn decrypt_from_raw<S: AdnlPrivateKey, F: Fn(&AdnlAddress) -> Option<S>>(packet: &[u8; 256], private_key_selector: F) -> Result<Self, AdnlError> {
         let receiver = packet[..32].try_into().unwrap();
         let sender = packet[32..64].try_into().unwrap();
         let hash: [u8; 32] = packet[64..96].try_into().unwrap();
         let mut raw_params: [u8; 160] = packet[96..256].try_into().unwrap();
 
+        let key = private_key_selector(&receiver).ok_or_else(|| AdnlError::UnknownAddr(receiver.clone()))?;
+
         if key.public().address() != receiver {
+            log::error!("private key selector returned wrong key, expected address: {:?}, got: {:?}", &receiver, &key.public().address());
             return Err(AdnlError::UnknownAddr(receiver))
         }
 

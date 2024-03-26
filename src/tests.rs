@@ -67,6 +67,7 @@ fn test_handshake(
     );
 
     // test deserializing
+    #[derive(Clone)]
     struct DummyKey {
         ecdh: AdnlSecret,
         public: AdnlRawPublicKey
@@ -85,7 +86,7 @@ fn test_handshake(
     }
 
     let key = DummyKey { ecdh: ecdh, public: remote_public.clone() };
-    let handshake2 = AdnlHandshake::decrypt_from_raw(expected_handshake.as_slice().try_into().unwrap(), &key).expect("invalid handshake");
+    let handshake2 = AdnlHandshake::decrypt_from_raw(expected_handshake.as_slice().try_into().unwrap(), |_| Some(key.clone())).expect("invalid handshake");
     assert_eq!(handshake2.aes_params().to_bytes(), aes_params_raw, "aes_params mismatch");
     assert_eq!(handshake2.receiver(), &remote_public.address(), "receiver mismatch");
     assert_eq!(handshake2.sender().edwards_repr(), local_public.edwards_repr(), "sender mismatch");
@@ -183,7 +184,7 @@ async fn integrity_test() {
             let (socket, _) = listener.accept().await.unwrap();
             let private_key = server_private.clone();
             tokio::spawn(async move {
-                let mut adnl_server = AdnlPeer::handle_handshake(socket, &private_key).await.expect("handshake failed");
+                let mut adnl_server = AdnlPeer::handle_handshake(socket, |_| Some(private_key.clone())).await.expect("handshake failed");
                 while let Some(Ok(packet)) = adnl_server.next().await {
                     let _ = adnl_server.send(packet).await;
                 }

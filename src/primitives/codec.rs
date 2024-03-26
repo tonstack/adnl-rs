@@ -6,6 +6,7 @@ use crate::{AdnlAesParams, AdnlError};
 
 use super::AdnlAes;
 
+/// Implementation of ADNL protocol. Connection must be first initialized with [`AdnlHandshake`] to exchange keys.
 pub struct AdnlCodec {
     aes_rx: AdnlAes,
     aes_tx: AdnlAes,
