@@ -1,6 +1,8 @@
-use crate::{AdnlAddress, AdnlAesParams, AdnlHandshake, AdnlPublicKey, AdnlSecret};
+use crate::crypto::{KeyPair, PublicKey};
 
-use crate::helper_types::{AdnlPrivateKey, CryptoRandom};
+use crate::{AdnlAddress, AdnlAesParams, AdnlHandshake};
+
+use crate::helper_types::CryptoRandom;
 
 /// Builder of [`AdnlHandshake`] structure, which then can be transformed into [`crate::AdnlClient`]
 pub struct AdnlBuilder {
@@ -25,12 +27,12 @@ impl AdnlBuilder {
     }
 
     /// Specify sender, receiver, and secret on which they already agreed.
-    pub fn use_static_ecdh<P: AdnlPublicKey>(
+    pub fn use_static_ecdh(
         self,
-        sender_public: P,
+        sender_public: PublicKey,
         receiver_address: AdnlAddress,
-        ecdh_secret: AdnlSecret,
-    ) -> AdnlHandshake<P> {
+        ecdh_secret: [u8; 32],
+    ) -> AdnlHandshake {
         AdnlHandshake::new(
             receiver_address,
             sender_public,
@@ -40,19 +42,17 @@ impl AdnlBuilder {
     }
 
     /// Perform key agreement using sender private key and receiver public
-    pub fn perform_ecdh<S, P>(
+    pub fn perform_ecdh(
         self,
-        sender_private: S,
-        receiver_public: P,
-    ) -> AdnlHandshake<<S as AdnlPrivateKey>::PublicKey>
-    where
-        S: AdnlPrivateKey,
-        P: AdnlPublicKey,
-    {
+        sender_keypair: &KeyPair,
+        receiver_public: &PublicKey,
+    ) -> AdnlHandshake {
         AdnlHandshake::new(
-            receiver_public.address(),
-            sender_private.public(),
-            sender_private.key_agreement(receiver_public),
+            AdnlAddress::from(receiver_public),
+            sender_keypair.public_key,
+            sender_keypair
+                .secret_key
+                .compute_shared_secret(receiver_public),
             self.aes_params,
         )
     }

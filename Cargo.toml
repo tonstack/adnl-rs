@@ -5,7 +5,7 @@ repository = "https://github.com/tonstack/adnl-rs"
 keywords = ["ton"]
 categories = ["network-programming"]
 license = "MIT"
-version = "1.0.0"
+version = "2.0.0"
 authors = ["Vladimir Lebedev <d3fl4t3@gmail.com>"]
 edition = "2021"
 
@@ -15,24 +15,25 @@ ctr = "0.9.1"
 aes = "0.8.1"
 log = "0.4.14"
 rand_core = "0.6.3"
-x25519-dalek = { version = "2.0.0-pre.1", optional = true }
-curve25519-dalek = { version = "4.0.0-pre.2", optional = true }
-tokio = { version = "1.36", features = ["net", "io-util"]}
+tokio = { version = "1", features = ["net", "io-util"] }
+tokio-util = { version = "0.7.10", features = ["codec"] }
 thiserror = "1"
 rand = "0.8.5"
+futures = "0.3"
+pin-project = "1"
+hex = "0.4.3"
+everscale-crypto = "0.2.1"
 
 [dev-dependencies]
 hex = "0.4.3"
-x25519-dalek = "= 2.0.0-pre.1"
-curve25519-dalek = "= 4.0.0-pre.2"
 tokio = { version = "1.36", features = ["rt-multi-thread", "macros"]}
-base64 = "0.13.0"
-anyhow = "1"
-
-[features]
-default = ["dalek"]
-dalek = ["x25519-dalek", "curve25519-dalek"]
+base64 = "0.22.1"
 
 [[example]]
 name = "time"
-required-features = ["dalek"]
+
+[[example]]
+name = "echo_client"
+
+[[example]]
+name = "echo_server"
