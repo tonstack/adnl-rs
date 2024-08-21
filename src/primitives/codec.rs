@@ -1,6 +1,9 @@
 use aes::cipher::{KeyIvInit, StreamCipher};
 use sha2::{Digest, Sha256};
-use tokio_util::{bytes::{Buf, Bytes, BytesMut}, codec::{Decoder, Encoder}};
+use tokio_util::{
+    bytes::{Buf, Bytes, BytesMut},
+    codec::{Decoder, Encoder},
+};
 
 use crate::{AdnlAesParams, AdnlError};
 
@@ -41,7 +44,7 @@ impl Decoder for AdnlCodec {
             length
         } else {
             if src.len() < 4 {
-                return Ok(None)
+                return Ok(None);
             }
             self.aes_rx.apply_keystream(&mut src[..4]);
             let mut length_bytes = [0u8; 4];
@@ -63,24 +66,24 @@ impl Decoder for AdnlCodec {
             if src.capacity() < length {
                 src.reserve(length - src.capacity());
             }
-            return Ok(None)
+            return Ok(None);
         }
 
         self.last_readed_length = None;
 
         // decode packet
         self.aes_rx.apply_keystream(&mut src[..length]);
-        let given_hash = &src[length-32..length];
+        let given_hash = &src[length - 32..length];
 
         // integrity check
         let mut hasher = Sha256::new();
-        hasher.update(&src[..length-32]);
+        hasher.update(&src[..length - 32]);
         if given_hash != hasher.finalize().as_slice() {
-            return Err(AdnlError::IntegrityError)
+            return Err(AdnlError::IntegrityError);
         }
 
         // copy and return buffer
-        let result = Bytes::copy_from_slice(&src[32..length-32]);
+        let result = Bytes::copy_from_slice(&src[32..length - 32]);
         src.advance(length);
         Ok(Some(result))
     }
@@ -96,7 +99,7 @@ impl Encoder<Bytes> for AdnlCodec {
         let length = ((buffer.len() + 64) as u32).to_le_bytes();
         let nonce = rand::random::<[u8; 32]>();
         let mut hash = Sha256::new();
-        hash.update(&nonce);
+        hash.update(nonce);
         hash.update(&buffer);
         let hash = hash.finalize();
         dst.reserve(buffer.len() + 68);

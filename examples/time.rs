@@ -1,18 +1,18 @@
-use adnl::{AdnlPeer, AdnlRawPublicKey};
+use adnl::AdnlPeer;
+use base64::Engine as _;
 use futures::{SinkExt, StreamExt};
-use std::{error::Error, net::SocketAddrV4};
+use std::error::Error;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     // decode liteserver public key
-    let remote_public = AdnlRawPublicKey::try_from(&*base64::decode("JhXt7H1dZTgxQTIyGiYV4f9VUARuDxFl/1kVBjLSMB8=")?)?;
+    let remote_public = base64::engine::general_purpose::STANDARD
+        .decode("n4VDnSCUuSpjnCyUk9e3QOOd6o0ItSWYbTnW3Wnn8wk=")?;
 
-    let ls_ip = "65.21.74.140";
-    let ls_port = 46427;
     // act as a client: connect to ADNL server and perform handshake
-    let mut client = AdnlPeer::connect(&remote_public, SocketAddrV4::new(ls_ip.parse()?, ls_port)).await?;
+    let mut client = AdnlPeer::connect(remote_public, "5.9.10.47:19949").await?;
 
-    // already serialized TL with gettime query
+    // already serialized TL with getTime query
     let query = hex::decode("7af98bb435263e6c95d6fecb497dfd0aa5f031e7d412986b5ce720496db512052e8f2d100cdf068c7904345aad16000000000000")?;
 
     // send over ADNL

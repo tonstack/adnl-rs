@@ -1,6 +1,6 @@
-use crate::helper_types::AdnlRawPublicKey;
+use crate::crypto::{KeyPair, PublicKey};
 use crate::primitives::AdnlAes;
-use crate::{AdnlAddress, AdnlAesParams, AdnlPeer, AdnlError, AdnlPrivateKey, AdnlPublicKey, AdnlSecret};
+use crate::{AdnlAddress, AdnlAesParams, AdnlError, AdnlPeer};
 use aes::cipher::KeyIvInit;
 use ctr::cipher::StreamCipher;
 use sha2::{Digest, Sha256};
@@ -9,20 +9,20 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use super::codec::AdnlCodec;
 
 /// Handshake packet, must be sent from client to server prior to any datagrams
-pub struct AdnlHandshake<P: AdnlPublicKey> {
+pub struct AdnlHandshake {
     receiver: AdnlAddress,
-    sender: P,
+    sender: PublicKey,
     aes_params: AdnlAesParams,
-    secret: AdnlSecret,
+    secret: [u8; 32],
 }
 
-impl<P: AdnlPublicKey> AdnlHandshake<P> {
+impl AdnlHandshake {
     /// Create handshake with given sender and receiver, who already agreed on given secret, also
     /// use given session parameters
     pub fn new(
         receiver: AdnlAddress,
-        sender: P,
-        secret: AdnlSecret,
+        sender: PublicKey,
+        secret: [u8; 32],
         aes_params: AdnlAesParams,
     ) -> Self {
         Self {
@@ -39,7 +39,7 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
     }
 
     /// Get initiator public key of this handshake
-    pub fn sender(&self) -> &P {
+    pub fn sender(&self) -> &PublicKey {
         &self.sender
     }
 
@@ -57,7 +57,7 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
 
         let mut packet = [0u8; 256];
         packet[..32].copy_from_slice(self.receiver.as_bytes());
-        packet[32..64].copy_from_slice(&self.sender.edwards_repr());
+        packet[32..64].copy_from_slice(self.sender.as_bytes());
         packet[64..96].copy_from_slice(&hash);
         packet[96..256].copy_from_slice(&raw_params);
         packet
@@ -76,17 +76,17 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
         &self,
         transport: T,
     ) -> Result<AdnlPeer<T>, AdnlError> {
-        AdnlPeer::perform_handshake(transport, self).await
+        AdnlPeer::perform_custom_handshake(transport, self).await
     }
 
-    fn initialize_aes(secret: &AdnlSecret, hash: &[u8]) -> AdnlAes {
+    fn initialize_aes(secret: &[u8; 32], hash: &[u8]) -> AdnlAes {
         let mut key = [0u8; 32];
-        key[..16].copy_from_slice(&secret.as_bytes()[..16]);
+        key[..16].copy_from_slice(&secret[..16]);
         key[16..32].copy_from_slice(&hash[16..32]);
 
         let mut nonce = [0u8; 16];
         nonce[..4].copy_from_slice(&hash[..4]);
-        nonce[4..16].copy_from_slice(&secret.as_bytes()[20..32]);
+        nonce[4..16].copy_from_slice(&secret[20..32]);
 
         AdnlAes::new(key.as_slice().into(), nonce.as_slice().into())
     }
@@ -96,29 +96,37 @@ impl<P: AdnlPublicKey> AdnlHandshake<P> {
         hasher.update(data);
         hasher.finalize().into()
     }
-}
 
-impl AdnlHandshake<AdnlRawPublicKey> {
-    /// Deserialize and decrypt handshake using private key from `private_key_selector` function
-    pub fn decrypt_from_raw<S: AdnlPrivateKey, F: Fn(&AdnlAddress) -> Option<S>>(packet: &[u8; 256], private_key_selector: F) -> Result<Self, AdnlError> {
+    /// Deserialize and decrypt handshake using keypair from `keypair_selector` function
+    pub fn decrypt_from_raw<F: Fn(&AdnlAddress) -> Option<KeyPair>>(
+        packet: &[u8; 256],
+        keypair_selector: F,
+    ) -> Result<Self, AdnlError> {
         let receiver = packet[..32].try_into().unwrap();
-        let sender = packet[32..64].try_into().unwrap();
+        let sender = PublicKey::from_bytes(packet[32..64].try_into().unwrap())
+            .ok_or_else(|| AdnlError::InvalidPublicKey)?;
         let hash: [u8; 32] = packet[64..96].try_into().unwrap();
         let mut raw_params: [u8; 160] = packet[96..256].try_into().unwrap();
 
-        let key = private_key_selector(&receiver).ok_or_else(|| AdnlError::UnknownAddr(receiver.clone()))?;
+        let keypair =
+            keypair_selector(&receiver).ok_or_else(|| AdnlError::UnknownAddr(receiver.clone()))?;
 
-        if key.public().address() != receiver {
-            log::error!("private key selector returned wrong key, expected address: {:?}, got: {:?}", &receiver, &key.public().address());
-            return Err(AdnlError::UnknownAddr(receiver))
+        let our_address = AdnlAddress::from(&keypair.public_key);
+        if our_address != receiver {
+            log::error!(
+                "private key selector returned wrong key, expected address: {:?}, got: {:?}",
+                &receiver,
+                our_address
+            );
+            return Err(AdnlError::UnknownAddr(receiver));
         }
 
-        let secret = key.key_agreement(&sender);
+        let secret = keypair.compute_shared_secret(&sender);
         let mut aes = Self::initialize_aes(&secret, &hash);
         aes.apply_keystream(&mut raw_params);
 
         if hash != Self::sha256(raw_params) {
-            return Err(AdnlError::IntegrityError)
+            return Err(AdnlError::IntegrityError);
         }
 
         Ok(Self {

@@ -1,3 +1,4 @@
+use crate::crypto::PublicKey;
 use sha2::{Digest, Sha256};
 use std::{array::TryFromSliceError, io::Error};
 use thiserror::Error;
@@ -6,66 +7,15 @@ pub trait CryptoRandom: rand_core::RngCore + rand_core::CryptoRng {}
 
 impl<T> CryptoRandom for T where T: rand_core::RngCore + rand_core::CryptoRng {}
 
-pub trait AdnlPublicKey {
-    /// Derives address from a public key
-    fn address(&self) -> AdnlAddress {
-        let mut hasher = Sha256::new();
-        hasher.update([0xc6, 0xb4, 0x13, 0x48]); // type id - always ed25519
-        hasher.update(self.edwards_repr());
-        AdnlAddress(hasher.finalize().into())
-    }
-
-    /// Gets ed25519 representation of a public key
-    fn edwards_repr(&self) -> [u8; 32];
-}
-
-/// Public key can be provided in a ed25519 form using raw slice
-#[derive(Clone)]
-pub struct AdnlRawPublicKey([u8; 32]);
-
-impl AdnlPublicKey for AdnlRawPublicKey {
-    fn edwards_repr(&self) -> [u8; 32] {
-        self.0
-    }
-}
-
-impl From<[u8; 32]> for AdnlRawPublicKey {
-    fn from(value: [u8; 32]) -> Self {
-        Self(value)
-    }
-}
-
-impl TryFrom<&[u8]> for AdnlRawPublicKey {
-    type Error = TryFromSliceError;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        Ok(Self(value.try_into()?))
-    }
-}
-
-/// Trait which must be implemented to perform key agreement inside [`AdnlHandshake`]
-pub trait AdnlPrivateKey {
-    type PublicKey: AdnlPublicKey;
-
-    /// Perform key agreement protocol (usually x25519) between our private key
-    /// and their public
-    fn key_agreement<P: AdnlPublicKey>(&self, their_public: &P) -> AdnlSecret;
-
-    /// Get public key corresponding to this private
-    fn public(&self) -> Self::PublicKey;
-}
-
-/// Wrapper struct to hold the secret, result of ECDH between peers
-#[derive(Clone)]
-pub struct AdnlSecret([u8; 32]);
-
 /// Wrapper struct to hold ADNL address, which is a hash of public key
 #[derive(PartialEq, Clone)]
 pub struct AdnlAddress([u8; 32]);
 
 impl std::fmt::Debug for AdnlAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("AdnlAddress").field(&format!("{:02x?}", &self.0)).finish()
+        f.debug_tuple("AdnlAddress")
+            .field(&format!("{:02x?}", &self.0))
+            .finish()
     }
 }
 
@@ -80,6 +30,15 @@ impl TryFrom<&[u8]> for AdnlAddress {
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         Ok(Self(value.try_into()?))
+    }
+}
+
+impl From<&PublicKey> for AdnlAddress {
+    fn from(value: &PublicKey) -> Self {
+        let mut hasher = Sha256::new();
+        hasher.update([0xc6, 0xb4, 0x13, 0x48]); // type id - always ed25519
+        hasher.update(value.as_bytes());
+        AdnlAddress(hasher.finalize().into())
     }
 }
 
@@ -135,13 +94,9 @@ impl AdnlAesParams {
 
     /// Generate random session parameters
     pub fn random<T: CryptoRandom>(csprng: &mut T) -> Self {
-        let mut result: AdnlAesParams = Default::default();
-        csprng.fill_bytes(&mut result.rx_key);
-        csprng.fill_bytes(&mut result.tx_key);
-        csprng.fill_bytes(&mut result.rx_nonce);
-        csprng.fill_bytes(&mut result.tx_nonce);
-        csprng.fill_bytes(&mut result.padding);
-        result
+        let mut result = [0u8; 160];
+        csprng.fill_bytes(&mut result);
+        Self::from(result)
     }
 }
 
@@ -157,25 +112,7 @@ impl Default for AdnlAesParams {
     }
 }
 
-impl From<[u8; 32]> for AdnlSecret {
-    fn from(secret: [u8; 32]) -> Self {
-        Self(secret)
-    }
-}
-
 impl AdnlAddress {
-    #[inline]
-    pub fn to_bytes(&self) -> [u8; 32] {
-        self.0
-    }
-
-    #[inline]
-    pub fn as_bytes(&self) -> &[u8; 32] {
-        &self.0
-    }
-}
-
-impl AdnlSecret {
     #[inline]
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0
@@ -202,6 +139,8 @@ pub enum AdnlError {
     UnknownAddr(AdnlAddress),
     #[error("End of stream")]
     EndOfStream,
+    #[error("Invalid public key")]
+    InvalidPublicKey,
 }
 
 /// Information about connected peers.
@@ -212,7 +151,10 @@ pub struct AdnlConnectionInfo {
 
 impl AdnlConnectionInfo {
     pub fn new(local_address: AdnlAddress, remote_address: AdnlAddress) -> Self {
-        Self { local_address, remote_address }
+        Self {
+            local_address,
+            remote_address,
+        }
     }
 
     pub fn local_address(&self) -> &AdnlAddress {

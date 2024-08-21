@@ -2,10 +2,10 @@
 
 use std::{env, error::Error};
 
-use adnl::{AdnlPeer, AdnlPrivateKey, AdnlPublicKey};
+use adnl::crypto::{KeyPair, SecretKey};
+use adnl::{AdnlAddress, AdnlPeer};
 use futures::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
-use x25519_dalek::StaticSecret;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -17,9 +17,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .unwrap_or_else(|| "127.0.0.1:8080".to_string());
 
     // ADNL: get private key from environment variable KEY or use default insecure one
-    let private_key_hex = env::var("KEY").unwrap_or_else(|_| "f0971651aec4bb0d65ec3861c597687fda9c1e7d2ee8a93acb9a131aa9f3aee7".to_string());
+    let private_key_hex = env::var("KEY").unwrap_or_else(|_| {
+        "f0971651aec4bb0d65ec3861c597687fda9c1e7d2ee8a93acb9a131aa9f3aee7".to_string()
+    });
     let private_key_bytes: [u8; 32] = hex::decode(private_key_hex)?.try_into().unwrap();
-    let private_key = StaticSecret::from(private_key_bytes);
+    let keypair = KeyPair::from(&SecretKey::from_bytes(private_key_bytes));
 
     // Next up we create a TCP listener which will listen for incoming
     // connections. This TCP listener is bound to the address we determined
@@ -28,8 +30,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Listening on: {}", addr);
 
     // ADNL: print public key and adnl address associated with given private key
-    println!("Public key is: {}", hex::encode(private_key.public().edwards_repr()));
-    println!("Address is: {}", hex::encode(private_key.public().address().as_bytes()));
+    println!(
+        "Public key is: {}",
+        hex::encode(keypair.public_key.as_bytes())
+    );
+    println!(
+        "Address is: {}",
+        hex::encode(AdnlAddress::from(&keypair.public_key).as_bytes())
+    );
 
     loop {
         // Asynchronously wait for an inbound socket.
@@ -43,10 +51,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // Essentially here we're executing a new task to run concurrently,
         // which will allow all of our clients to be processed concurrently.
 
-        let private_key = private_key.clone();
+        let private_key = keypair.clone();
         tokio::spawn(async move {
             // ADNL: handle handshake
-            let mut adnl_server = AdnlPeer::handle_handshake(socket, |_| Some(private_key.clone())).await.expect("handshake failed");
+            let mut adnl_server = AdnlPeer::handle_handshake(socket, |_| Some(private_key.clone()))
+                .await
+                .expect("handshake failed");
 
             // In a loop, read data from the socket and write the data back.
             while let Some(Ok(packet)) = adnl_server.next().await {
